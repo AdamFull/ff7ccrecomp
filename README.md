@@ -34,5 +34,15 @@ ccpkg verify  <game> out/               # compare two archives file by file
 
 `<game>` can be the extracted disc root, `PSP_GAME`, `USRDIR`, or any folder with the two archive files.
 
+`ccatel` works on the `Atel` script modules found inside the archive (`*.atel` after extraction):
+
+```
+ccatel info    file.atel                # objects, methods, entry points, resources
+ccatel strings file.atel                # decrypted name/string pool
+ccatel unpack  file.atel dir/           # module.txt + names.bin + code.bin + res/
+ccatel pack    dir/ file.atel           # rebuild (names re-encrypted unless flags bit 0 is set)
+ccatel verify  extracted/pkg/files      # check every module rebuilds byte for byte
+```
+
 Licensed under the MIT License. *Crisis Core: Final Fantasy VII* is a trademark of Square Enix;
 this project is not affiliated with or endorsed by Square Enix.
