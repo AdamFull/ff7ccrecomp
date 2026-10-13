@@ -15,7 +15,8 @@ Requirements: CMake ≥ 3.25, Ninja, LLVM/Clang. On Windows, also Visual Studio 
 CRT used by `clang-cl`). Run the commands from an *x64 Native Tools / Developer* prompt.
 
 ```
-cmake --preset windows-x64-debug      # or linux-x64-debug
+scriptsbuild.ps1                     # Windows: sets up the VS environment, builds, runs tests
+cmake --preset windows-x64-debug      # or linux-x64-debug, from a developer prompt
 cmake --build --preset windows-x64-debug
 ctest --preset windows-x64-debug
 ```
