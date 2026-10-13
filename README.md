@@ -54,6 +54,8 @@ ccprx info    BOOT.BIN                  # module info, segments, imports/exports
 ccprx nids    "PSP SDK/pspsdk-MINPSPW/psp/sdk/lib" build/nids.tsv   # NID names from local SDK stubs
 ccprx imports BOOT.BIN build/nids.tsv   # all 197 imported system functions with names
 ccprx image   BOOT.BIN 0x08804000 build/boot.bin   # relocated memory image (PPSSPP's load base)
+ccprx disasm  BOOT.BIN                  # objdump-compatible listing (scripts/check_allegrex.ps1 diffs it)
+ccprx symbols BOOT.BIN build/nids.tsv build/symbols.tsv 0x08804000 build/ghidra_symbols.txt
 ```
 
 The NID database is generated locally and not committed. `tools/analysis/nids_from_ppsspp.py` fills the
