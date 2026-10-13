@@ -41,6 +41,7 @@ ccpkg verify  <game> out/               # compare two archives file by file
 ```
 ccatel info    file.atel                # objects, methods, entry points, resources
 ccatel strings file.atel                # decrypted name/string pool
+ccatel disasm  file.atel [out.txt]      # bytecode listing (labels, resolved names, native calls)
 ccatel unpack  file.atel dir/           # module.txt + names.bin + code.bin + res/
 ccatel pack    dir/ file.atel           # rebuild (names re-encrypted unless flags bit 0 is set)
 ccatel verify  extracted/pkg/files      # check every module rebuilds byte for byte

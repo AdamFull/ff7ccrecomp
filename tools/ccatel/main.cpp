@@ -12,6 +12,8 @@
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
+#include "ff7cc/formats/atel_disasm.hpp"
+#include "ff7cc/formats/atel_vm.hpp"
 #include "ff7cc/io/file.hpp"
 
 namespace fs = std::filesystem;
@@ -28,9 +30,10 @@ void usage() {
         "\n"
         "  info    <file.atel>               header, objects/methods and resources\n"
         "  strings <file.atel>               every string in the (decrypted) name pool\n"
+        "  disasm  <file.atel> [out.txt]     bytecode listing with labels and resolved names\n"
         "  unpack  <file.atel> <dir>         module.txt + names.bin + code.bin + res/\n"
         "  pack    <dir> <file.atel>         rebuild a module from an unpacked directory\n"
-        "  verify  <file-or-dir>...          check parse -> serialize is byte-exact\n",
+        "  verify  <file-or-dir>...          check parse -> serialize and decode -> encode are byte-exact\n",
         stderr);
 }
 
@@ -101,6 +104,17 @@ int cmd_strings(const fs::path& path) {
         const auto s = m.name_at(static_cast<std::uint32_t>(off));
         std::printf("%6zu  %s\n", off, printable(s).c_str());
         off += s.size() + 1;
+    }
+    return 0;
+}
+
+int cmd_disasm(const fs::path& path, const fs::path& out_path) {
+    const auto text = atel::disassemble(load(path));
+    if (out_path.empty()) {
+        std::fwrite(text.data(), 1, text.size(), stdout);
+    } else {
+        if (out_path.has_parent_path()) fs::create_directories(out_path.parent_path());
+        io::write_all(out_path, std::as_bytes(std::span(text)));
     }
     return 0;
 }
@@ -233,12 +247,20 @@ int cmd_verify(const std::vector<fs::path>& inputs) {
     for (const auto& f : files) {
         try {
             const auto original = io::read_all(f);
-            const auto rebuilt = atel::serialize(atel::parse(original));
+            const auto module = atel::parse(original);
+            const auto rebuilt = atel::serialize(module);
             if (rebuilt != original) {
                 ++failed;
                 const auto diff = std::mismatch(original.begin(), original.end(), rebuilt.begin(), rebuilt.end());
                 std::printf("%s: rebuilt module differs at offset %td (sizes %zu / %zu)\n", f.string().c_str(),
                             diff.first - original.begin(), original.size(), rebuilt.size());
+                continue;
+            }
+            std::vector<std::byte> code;
+            for (const auto& insn : atel::decode_all(module.code)) atel::encode(insn, code);
+            if (code != module.code) {
+                ++failed;
+                std::printf("%s: bytecode does not re-encode identically\n", f.string().c_str());
             }
         } catch (const std::exception& e) {
             ++failed;
@@ -261,6 +283,8 @@ int main(int argc, char** argv) {
         const auto cmd = args[0];
         if (cmd == "info" && args.size() == 2) return cmd_info(fs::path(args[1]));
         if (cmd == "strings" && args.size() == 2) return cmd_strings(fs::path(args[1]));
+        if (cmd == "disasm" && (args.size() == 2 || args.size() == 3))
+            return cmd_disasm(fs::path(args[1]), args.size() == 3 ? fs::path(args[2]) : fs::path());
         if (cmd == "unpack" && args.size() == 3) return cmd_unpack(fs::path(args[1]), fs::path(args[2]));
         if (cmd == "pack" && args.size() == 3) return cmd_pack(fs::path(args[1]), fs::path(args[2]));
         if (cmd == "verify" && args.size() >= 2)
