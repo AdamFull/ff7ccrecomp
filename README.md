@@ -47,5 +47,17 @@ ccatel pack    dir/ file.atel           # assemble code.asm and rebuild the modu
 ccatel verify  extracted/pkg/files      # check every module rebuilds byte for byte
 ```
 
+`ccprx` works on the game executable (`PSP_GAME/SYSDIR/BOOT.BIN`, an unencrypted PRX):
+
+```
+ccprx info    BOOT.BIN                  # module info, segments, imports/exports, relocation stats
+ccprx nids    "PSP SDK/pspsdk-MINPSPW/psp/sdk/lib" build/nids.tsv   # NID names from local SDK stubs
+ccprx imports BOOT.BIN build/nids.tsv   # all 197 imported system functions with names
+ccprx image   BOOT.BIN 0x08804000 build/boot.bin   # relocated memory image (PPSSPP's load base)
+```
+
+The NID database is generated locally and not committed. `tools/analysis/nids_from_ppsspp.py` fills the
+names the homebrew SDK lacks (e.g. `sceSasCore`) from a PPSSPP debug log.
+
 Licensed under the MIT License. *Crisis Core: Final Fantasy VII* is a trademark of Square Enix;
 this project is not affiliated with or endorsed by Square Enix.
