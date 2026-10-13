@@ -58,6 +58,13 @@ ccprx disasm  BOOT.BIN                  # objdump-compatible listing (scripts/ch
 ccprx symbols BOOT.BIN build/nids.tsv build/symbols.tsv 0x08804000 build/ghidra_symbols.txt
 ```
 
+`ccrecomp` translates BOOT.BIN into C (see [docs/recompiler.md](docs/recompiler.md)); the output goes to the
+git-ignored `generated/` folder and is picked up by the build automatically:
+
+```
+ccrecomp "Crisis Core - Final Fantasy VII EU/PSP_GAME/SYSDIR/BOOT.BIN" generated
+```
+
 The NID database is generated locally and not committed. `tools/analysis/nids_from_ppsspp.py` fills the
 names the homebrew SDK lacks (e.g. `sceSasCore`) from a PPSSPP debug log.
 
