@@ -12,11 +12,12 @@ built by static recompilation and progressive decompilation.
 ## Building
 
 Requirements: CMake ≥ 3.25, Ninja, LLVM/Clang. On Windows, also Visual Studio 2022 (for the Windows SDK and
-CRT used by `clang-cl`). Run the commands from an *x64 Native Tools / Developer* prompt.
+CRT used by `clang-cl`). On Windows, `scripts\build.ps1` sets up that environment itself; otherwise run the
+CMake commands from an *x64 Native Tools / Developer* prompt.
 
 ```
-scriptsbuild.ps1                     # Windows: sets up the VS environment, builds, runs tests
-cmake --preset windows-x64-debug      # or linux-x64-debug, from a developer prompt
+scripts\build.ps1                     # Windows: configure, build, run tests (-Preset, -NoTest)
+cmake --preset windows-x64-debug      # or linux-x64-debug
 cmake --build --preset windows-x64-debug
 ctest --preset windows-x64-debug
 ```
