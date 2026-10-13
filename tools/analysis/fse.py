@@ -1,19 +1,13 @@
-import struct,sys,collections
+# discimg.fse = array of {u32 sector (2048-byte units), u32 size, u32 reserved(0)}.
+# Entry 0 is the pkg's own 'Atel' header at sector 0 (3088 bytes).
+import struct,sys
 d=open(sys.argv[1],'rb').read()
-n=len(d)
-print("fse size",n, "mod12 from 8:",(n-8)%12)
-ents=[]
-o=8
-while o+12<=n:
-    a,b,c=struct.unpack('<III',d[o:o+12]); ents.append((o,a,b,c)); o+=12
-for e in ents[:12]: print([hex(x) for x in e])
+assert len(d)%12==0, "unexpected fse size"
+ents=[struct.unpack('<III',d[o:o+12]) for o in range(0,len(d),12)]
+print("entries",len(ents),"reserved nonzero:",sum(1 for e in ents if e[2]))
+for i,e in enumerate(ents[:12]): print(i,[hex(x) for x in e])
 print("...")
-for e in ents[-8:]: print([hex(x) for x in e])
-fl=collections.Counter(e[1] for e in ents); print("first field top:",[(hex(k),v) for k,v in fl.most_common(10)])
-# check contiguity
-bad=0
-for i in range(len(ents)-1):
-    _,a,s,z=ents[i]; _,a2,s2,z2=ents[i+1]
-    if s2!=s+(z+0x7ff)//0x800: bad+=1
-print("entries",len(ents),"noncontiguous",bad)
-last=max(ents,key=lambda e:e[2]); print("max sector",hex(last[2]),"end byte",hex(last[2]*0x800+last[3]))
+for i,e in list(enumerate(ents))[-4:]: print(i,[hex(x) for x in e])
+bad=sum(1 for i in range(len(ents)-1) if ents[i+1][0]!=ents[i][0]+(ents[i][1]+0x7ff)//0x800)
+print("noncontiguous",bad)
+s,z,_=ents[-1]; print("archive end",hex(s*0x800+z))
