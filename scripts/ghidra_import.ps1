@@ -4,11 +4,12 @@
 #
 # Needs a debug build (scripts\build.ps1), build\nids.tsv (see README) and a JDK supported by your Ghidra
 # (Ghidra 12 requires JDK 21; set JAVA_HOME if several JDKs are installed).
-# Stock Ghidra MIPS does not know the Allegrex VFPU: functions using vector instructions are only partly
-# disassembled. An Allegrex language (e.g. the ghidra-allegrex extension) can be passed with -Language.
+# The default language comes from the ghidra-allegrex extension (Allegrex integer + FPU + VFPU), installed in
+# %APPDATA%\ghidra\<ghidra version>\Extensions. Without it, pass -Language MIPS:LE:32:default (stock MIPS
+# does not know the VFPU, so functions using vector instructions are only partly disassembled).
 param(
     [string]$Ghidra = 'C:\Program Files\ghidra_12.1.4_PUBLIC',
-    [string]$Language = 'MIPS:LE:32:default',
+    [string]$Language = 'Allegrex:LE:32:default',
     [string]$Base = '0x08804000'
 )
 $ErrorActionPreference = 'Continue'  # native tools print progress on stderr; exit codes are checked
