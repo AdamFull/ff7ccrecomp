@@ -1,7 +1,9 @@
 #include "ff7cc/formats/atel_disasm.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <charconv>
+#include <cmath>
 #include <cstdio>
 #include <map>
 #include <set>
@@ -21,6 +23,10 @@ std::string hex4(std::uint32_t v) {
 
 std::string format_float(float f) {
     char buf[32];
+    if (!std::isfinite(f)) {  // NaN payloads and infinities as raw bits so the assembler reproduces them exactly
+        std::snprintf(buf, sizeof buf, "bits(0x%08x)", std::bit_cast<std::uint32_t>(f));
+        return buf;
+    }
     const auto [end, ec] = std::to_chars(buf, buf + sizeof buf, f);
     std::string s(buf, ec == std::errc{} ? end : buf);
     if (s.find_first_of(".eEn") == std::string::npos) s += ".0";  // keep floats visibly floats

@@ -12,6 +12,7 @@
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
+#include "ff7cc/formats/atel_asm.hpp"
 #include "ff7cc/formats/atel_disasm.hpp"
 #include "ff7cc/formats/atel_vm.hpp"
 #include "ff7cc/io/file.hpp"
@@ -31,9 +32,9 @@ void usage() {
         "  info    <file.atel>               header, objects/methods and resources\n"
         "  strings <file.atel>               every string in the (decrypted) name pool\n"
         "  disasm  <file.atel> [out.txt]     bytecode listing with labels and resolved names\n"
-        "  unpack  <file.atel> <dir>         module.txt + names.bin + code.bin + res/\n"
+        "  unpack  <file.atel> <dir>         module.txt + names.bin + code.asm (editable) + res/\n"
         "  pack    <dir> <file.atel>         rebuild a module from an unpacked directory\n"
-        "  verify  <file-or-dir>...          check parse -> serialize and decode -> encode are byte-exact\n",
+        "  verify  <file-or-dir>...          check container, bytecode and listing round trips are byte-exact\n",
         stderr);
 }
 
@@ -123,17 +124,19 @@ int cmd_unpack(const fs::path& path, const fs::path& dir) {
     const auto m = load(path);
     fs::create_directories(dir / "res");
     io::write_all(dir / "names.bin", m.names);
-    io::write_all(dir / "code.bin", m.code);
+    const auto listing = atel::disassemble(m);
+    io::write_all(dir / "code.asm", std::as_bytes(std::span(listing)));
 
     std::ofstream out(dir / kManifestName, std::ios::binary);
     if (!out) throw IoError("cannot write manifest in '" + dir.string() + "'");
     out << kManifestHeader << "\n"
-        << "# Name fields are byte offsets into names.bin; method entry points are offsets into code.bin.\n"
+        << "# Name fields are byte offsets into names.bin. With code.asm, method entry points come from its\n"
+        << "# Object.method labels and new string literals are appended to names.bin when packing.\n"
         << "# Text after ';' is a comment. Slack/padding hex keeps the module byte-exact.\n";
     char buf[96];
     std::snprintf(buf, sizeof buf, "version %u %u %u 0x%02x\nseed 0x%08x\n", m.version_major, m.version_minor,
                   m.reserved, m.flags, m.seed);
-    out << buf << "names names.bin\ncode code.bin\ncode_padding " << hex(m.code_padding) << "\n";
+    out << buf << "names names.bin\ncode code.asm\ncode_padding " << hex(m.code_padding) << "\n";
     for (const auto& obj : m.objects) {
         out << "object " << obj.name << " attributes=" << obj.attributes << " unknown=" << obj.unknown << "  ; "
             << printable(m.name_at(obj.name)) << "\n";
@@ -175,6 +178,7 @@ int cmd_pack(const fs::path& dir, const fs::path& out_path) {
     if (!in) throw IoError("no " + std::string(kManifestName) + " in '" + dir.string() + "'");
 
     atel::Module m;
+    fs::path code_path;
     bool header_seen = false;
     std::string line;
     std::size_t line_no = 0;
@@ -199,7 +203,7 @@ int cmd_pack(const fs::path& dir, const fs::path& out_path) {
         } else if (key == "names" && tok.size() == 2) {
             m.names = io::read_all(dir / tok[1]);
         } else if (key == "code" && tok.size() == 2) {
-            m.code = io::read_all(dir / tok[1]);
+            code_path = dir / tok[1];
         } else if (key == "code_padding" && tok.size() <= 2) {
             m.code_padding = tok.size() == 2 ? unhex(tok[1]) : std::vector<std::byte>{};
         } else if (key == "object" && tok.size() == 4) {
@@ -221,6 +225,14 @@ int cmd_pack(const fs::path& dir, const fs::path& out_path) {
         }
     }
     if (!header_seen) throw FormatError("module.txt is missing the '" + std::string(kManifestHeader) + "' header");
+    if (code_path.empty()) throw FormatError("module.txt has no 'code' line");
+    // Code is assembled last: it needs the objects (for method labels) and may append to the name pool.
+    if (code_path.extension() == ".asm") {
+        const auto text = io::read_all(code_path);
+        atel::assemble_into(m, std::string_view(reinterpret_cast<const char*>(text.data()), text.size()));
+    } else {
+        m.code = io::read_all(code_path);
+    }
 
     // Round-trip through the parser so a broken module is caught here, not in the game.
     const auto bytes = atel::serialize(m);
@@ -261,6 +273,13 @@ int cmd_verify(const std::vector<fs::path>& inputs) {
             if (code != module.code) {
                 ++failed;
                 std::printf("%s: bytecode does not re-encode identically\n", f.string().c_str());
+                continue;
+            }
+            auto reassembled = module;
+            atel::assemble_into(reassembled, atel::disassemble(module));
+            if (atel::serialize(reassembled) != original) {
+                ++failed;
+                std::printf("%s: disassemble -> assemble does not reproduce the module\n", f.string().c_str());
             }
         } catch (const std::exception& e) {
             ++failed;
