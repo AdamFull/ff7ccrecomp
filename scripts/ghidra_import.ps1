@@ -1,0 +1,30 @@
+# Builds a Ghidra project for BOOT.BIN: relocated image at PPSSPP's load base + all recovered symbols.
+#
+#   scripts\ghidra_import.ps1 [-Ghidra "C:\Program Files\ghidra_12.1.4_PUBLIC"] [-Language MIPS:LE:32:default]
+#
+# Needs a debug build (scripts\build.ps1), build\nids.tsv (see README) and a JDK supported by your Ghidra
+# (Ghidra 12 requires JDK 21; set JAVA_HOME if several JDKs are installed).
+# Stock Ghidra MIPS does not know the Allegrex VFPU: functions using vector instructions are only partly
+# disassembled. An Allegrex language (e.g. the ghidra-allegrex extension) can be passed with -Language.
+param(
+    [string]$Ghidra = 'C:\Program Files\ghidra_12.1.4_PUBLIC',
+    [string]$Language = 'MIPS:LE:32:default',
+    [string]$Base = '0x08804000'
+)
+$ErrorActionPreference = 'Continue'  # native tools print progress on stderr; exit codes are checked
+$root = Split-Path -Parent $PSScriptRoot
+$boot = Join-Path $root 'Crisis Core - Final Fantasy VII EU\PSP_GAME\SYSDIR\BOOT.BIN'
+$ccprx = Join-Path $root 'build\windows-x64-debug\tools\ccprx\ccprx.exe'
+$out = Join-Path $root 'build\ghidra'
+New-Item -ItemType Directory -Force $out | Out-Null
+
+& $ccprx image $boot $Base "$out\boot_$Base.bin"
+if ($LASTEXITCODE) { throw 'ccprx image failed' }
+& $ccprx symbols $boot (Join-Path $root 'build\nids.tsv') "$out\symbols.tsv" $Base "$out\ghidra_symbols.txt"
+if ($LASTEXITCODE) { throw 'ccprx symbols failed' }
+
+& (Join-Path $Ghidra 'support\analyzeHeadless.bat') $out FF7CC -overwrite `
+    -import "$out\boot_$Base.bin" -loader BinaryLoader -loader-baseAddr $Base -processor $Language `
+    -scriptPath (Join-Path $root 'tools\ghidra') -preScript ImportFF7CCSymbols.java "$out\ghidra_symbols.txt"
+if ($LASTEXITCODE) { throw "analyzeHeadless failed ($LASTEXITCODE)" }
+Write-Host "Ghidra project: $out\FF7CC.gpr"
