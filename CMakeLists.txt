@@ -5,50 +5,32 @@ project(FF7CCRECOMP
     DESCRIPTION "Native port of Crisis Core: Final Fantasy VII (PSP) via static recompilation"
     LANGUAGES C CXX)
 
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# The recompiler and runtime (psprecore): libraries, front end, tools and their tests.
+add_subdirectory(psprecore)
 
-# Host tools (archive tools, recompiler, asset cooker) are not built for Android.
-if(ANDROID)
-    set(_ff7cc_host_default OFF)
-else()
-    set(_ff7cc_host_default ON)
-endif()
-option(FF7CC_BUILD_TOOLS "Build host-side tools" ${_ff7cc_host_default})
-option(FF7CC_BUILD_TESTS "Build unit tests (no game data required)" ${_ff7cc_host_default})
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-include(FF7CCCompilerOptions)
-
-include(FF7CCStb)
-include(FF7CCDav1d)
-
-option(FF7CC_BUILD_GAME "Build the game executable (needs SDL3/ImGui/miniaudio, fetched at configure time)" ON)
-if(FF7CC_BUILD_GAME)
-    include(FF7CCDependencies)
-endif()
-
-add_subdirectory(libs/foundation)
 add_subdirectory(libs/formats)
-add_subdirectory(libs/mips)
-add_subdirectory(libs/analysis)
-add_subdirectory(libs/recomp)
-add_subdirectory(runtime)
 
 if(FF7CC_BUILD_TOOLS)
     add_subdirectory(tools/ccpkg)
     add_subdirectory(tools/ccatel)
-    add_subdirectory(tools/ccprx)
-    add_subdirectory(tools/ccrecomp)
     add_subdirectory(tools/cccook)
     add_subdirectory(tools/cctext)
 endif()
 
 if(FF7CC_BUILD_TESTS)
-    enable_testing()
     add_subdirectory(tests)
+endif()
+
+# The game needs code generated from the user's own BOOT.BIN (ccrecomp -> generated/); game/ holds hand-written
+# replacements for recompiled functions (GAME_FUNC; run ccrecomp with --overrides game).
+set(FF7CC_GENERATED_DIR "${PROJECT_SOURCE_DIR}/generated" CACHE PATH "ccrecomp output directory")
+if(FF7CC_BUILD_GAME)
+    file(GLOB _ff7cc_game_sources CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/*.cpp")
+    ff7cc_add_game(ff7cc
+        GENERATED_DIR "${FF7CC_GENERATED_DIR}"
+        OVERRIDES_DIR "${PROJECT_SOURCE_DIR}/game"
+        SOURCES ${_ff7cc_game_sources})
+    if(TARGET ff7cc)
+        target_link_libraries(ff7cc PRIVATE ff7cc::game_formats)
+    endif()
 endif()

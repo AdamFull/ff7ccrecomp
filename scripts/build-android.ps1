@@ -141,7 +141,7 @@ try {
 
         $jni = Join-Path $root 'build\android-arm64-release\jniLibs\arm64-v8a'
         New-Item -ItemType Directory -Force $jni | Out-Null
-        Copy-Item (Join-Path $root 'build\android-arm64-release\runtime\libmain.so') $jni -Force
+        Copy-Item (Join-Path $root 'build\android-arm64-release\libmain.so') $jni -Force
 
         Push-Location (Join-Path $root 'android')
         try {

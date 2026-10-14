@@ -6,10 +6,10 @@
 #
 #   scripts\regress.ps1                  # check every recording that has a reference
 #   scripts\regress.ps1 -Update          # (re)write the references from the current build
-#   scripts\regress.ps1 -Dir D:\rec -Exe build\windows-x64-debug\runtime\ff7cc.exe
+#   scripts\regress.ps1 -Dir D:\rec -Exe build\windows-x64-debug\ff7cc.exe
 param(
     [string]$Dir = 'build\rec',
-    [string]$Exe = 'build\windows-x64-release\runtime\ff7cc.exe',
+    [string]$Exe = 'build\windows-x64-release\ff7cc.exe',
     [string]$GameDir = 'Crisis Core - Final Fantasy VII EU',
     [int]$Every = 500,   # vblanks between hashes
     [switch]$Update
