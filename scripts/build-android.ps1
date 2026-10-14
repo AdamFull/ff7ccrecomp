@@ -6,6 +6,8 @@
 #   scripts\build-android.ps1 -InstallData            # only copies the data (no build); the app must be installed
 #   scripts\build-android.ps1 -Install -Device Pixel_10_Pro   # pick the device: adb serial or model (adb devices -l)
 #   scripts\build-android.ps1 -ListDevices            # shows the connected devices and exits
+#   scripts\build-android.ps1 -Install -Smoke         # ... then starts the app silently for 2 seconds of game time
+#                                                     # and checks that it got there (library loads, game boots)
 #
 # With several devices connected and no -Device (or ANDROID_SERIAL), the script asks which one to use.
 #
@@ -25,7 +27,8 @@ param(
     [string]$CookedDir,     # default: "<repo>\cooked"
     [switch]$ResetAppData,  # uninstall first (deletes the app's files and saves on the device)
     [switch]$SkipBuild,     # install the APK built last time
-    [switch]$ListDevices
+    [switch]$ListDevices,
+    [switch]$Smoke          # launch test after installing (no sound; needs the game data on the device)
 )
 $ErrorActionPreference = 'Continue'  # native tools write warnings to stderr; exit codes are checked
 $root = Split-Path -Parent $PSScriptRoot
@@ -115,7 +118,7 @@ if ($ListDevices) {
     return
 }
 if ($ResetAppData -and -not $Install) { throw '-ResetAppData uninstalls the app; it needs -Install to put it back.' }
-$script:target = if ($Install -or $InstallData) { Select-Device } else { $null }  # before the long build: fail fast
+$script:target = if ($Install -or $InstallData -or $Smoke) { Select-Device } else { $null }  # before the long build: fail fast
 $build = -not $SkipBuild -and ($Install -or -not $InstallData)
 
 if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
@@ -157,4 +160,23 @@ try {
         Invoke-Adb install -r $apk
     }
     if ($InstallData) { Copy-GameData }
+    if ($Smoke) {
+        # The app writes its log to files/ff7cc.log; a library that fails to load never gets there.
+        $log = "$remoteFiles/ff7cc.log"
+        & $adb -s $script:target shell rm -f $log | Out-Null
+        & $adb -s $script:target shell am force-stop $package | Out-Null
+        & $adb -s $script:target shell "am start -n $package/.GameActivity -e args '--no-audio --vblanks 120'" | Out-Null
+        $text = ''
+        for ($i = 0; $i -lt 30 -and $text -notmatch 'stopped after'; $i++) {
+            Start-Sleep -Seconds 1
+            $text = (& $adb -s $script:target shell cat $log 2>$null) -join "`n"
+        }
+        & $adb -s $script:target shell am force-stop $package | Out-Null
+        if ($text -notmatch 'stopped after') {
+            $why = (& $adb -s $script:target logcat -d -t 300 2>$null |
+                    Select-String 'dlopen failed|FATAL|AndroidRuntime' | Select-Object -First 5) -join "`n"
+            throw "Smoke test failed: the app did not run 120 vblanks.`n$text`n$why"
+        }
+        Write-Host "Smoke test passed: $((($text -split "`n") | Select-String 'stopped after') -join '')"
+    }
 } finally { Pop-Location }
