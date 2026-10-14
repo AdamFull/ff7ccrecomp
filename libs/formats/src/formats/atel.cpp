@@ -239,4 +239,42 @@ std::string_view resource_type(std::span<const std::byte> data) {
     return "bin";
 }
 
+std::vector<std::byte> replace_resources(std::span<const std::byte> module,
+                                         const std::map<std::size_t, std::vector<std::byte>>& replacements) {
+    const Module m = parse(module);  // validates the layout
+    std::size_t table = kHeaderSize;
+    for (const auto& obj : m.objects) table += 12 + 8 * obj.methods.size();
+    table = align_up(table + m.names.size() + m.code.size(), kResourceAlignment);
+    const std::size_t count = m.resources.size(), base = table + 8 + 8 * count;
+
+    std::vector<std::byte> out(module.begin(), module.end());
+    const auto read32 = [&](std::size_t at) {
+        std::uint32_t v;
+        std::memcpy(&v, out.data() + at, 4);
+        return v;
+    };
+    const auto write32 = [&](std::size_t at, std::size_t v) {
+        const auto u = checked_u32(v, "resource table entry");
+        std::memcpy(out.data() + at, &u, 4);
+    };
+    for (const auto& [index, data] : replacements) {
+        if (index >= count) throw Error("resource " + std::to_string(index) + " does not exist");
+        const std::size_t entry = table + 8 + 8 * index;
+        const std::size_t offset = read32(entry);
+        const std::size_t space = (index + 1 < count ? read32(entry + 8) : module.size() - base) - offset;
+        if (data.size() <= space) {
+            std::memcpy(out.data() + base + offset, data.data(), data.size());
+            std::fill(out.begin() + static_cast<std::ptrdiff_t>(base + offset + data.size()),
+                      out.begin() + static_cast<std::ptrdiff_t>(base + offset + space), std::byte{0});
+        } else {
+            out.resize(align_up(out.size(), kResourceAlignment));
+            write32(entry, out.size() - base);
+            out.insert(out.end(), data.begin(), data.end());
+            out.resize(align_up(out.size(), kResourceAlignment));
+        }
+        write32(entry + 4, data.size());
+    }
+    return out;
+}
+
 }  // namespace ff7cc::atel

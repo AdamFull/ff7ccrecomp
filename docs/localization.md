@@ -21,6 +21,13 @@ cctext verify "Crisis Core - Final Fantasy VII EU"     # round-trip check of eve
 
 `build` rewrites only the modules whose text changed and writes them to `mods/french/pkg/NNNNN.atel`.
 
+Scripts address messages by byte offset inside their table (for example `Mes(2128, 18, ...)` shows the message at
+offset 2128 of resource 18), and some resources by their offset in the module. So `build` never moves anything: a
+changed message that fits in its original space is written in place; a longer one keeps its header where it was and
+its pages move to the end of the table; a table that grows is moved to the end of the module while every other
+resource stays put. Verified in game: translated subtitles in the opening show, and the run stays identical
+otherwise.
+
 ## Text syntax
 
 | Text | Meaning |

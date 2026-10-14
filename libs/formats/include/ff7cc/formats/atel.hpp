@@ -26,6 +26,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -82,6 +83,12 @@ bool is_atel(std::span<const std::byte> data);
 
 Module parse(std::span<const std::byte> data);
 std::vector<std::byte> serialize(const Module& module);
+
+// Replaces resources while every other byte of the module stays where it was (the game may address resources by
+// their offsets): a replacement that fits in the old resource's space (its data and slack) is written in place,
+// a larger one is appended at the end of the module. Only the resource table entries of replaced resources change.
+std::vector<std::byte> replace_resources(std::span<const std::byte> module,
+                                         const std::map<std::size_t, std::vector<std::byte>>& replacements);
 
 // The name-table cipher (symmetric): XOR with the low byte of successive game-LCG outputs,
 // state = state * 0x41C64E6D + 1234, output = (state >> 16) & 0x7FFF, seeded with Module::seed.

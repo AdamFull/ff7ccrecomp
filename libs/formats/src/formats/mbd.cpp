@@ -97,6 +97,54 @@ std::vector<std::byte> serialize(const std::vector<Message>& messages) {
     return out;
 }
 
+std::vector<std::byte> patch(std::span<const std::byte> original, const std::map<std::size_t, Message>& changes) {
+    const auto messages = parse(original);
+    // Start offset and size of every message in the original table.
+    std::vector<std::size_t> starts, sizes;
+    for (std::size_t p = 4; p < original.size();) {
+        const std::uint32_t pages = read32(original, p);
+        const std::uint32_t last_length = read32(original, p + 4 + 8 * (pages - 1));
+        const std::uint32_t last_offset = read32(original, p + 8 + 8 * (pages - 1));
+        starts.push_back(p);
+        sizes.push_back(last_offset + 4 * static_cast<std::size_t>(last_length));
+        p += sizes.back();
+    }
+    std::vector<std::byte> out(original.begin(), original.end());
+    const auto set32 = [&](std::size_t at, std::size_t v) {
+        const auto u = static_cast<std::uint32_t>(v);
+        std::memcpy(out.data() + at, &u, 4);
+    };
+    for (const auto& [index, message] : changes) {
+        if (index >= messages.size()) throw Error("MBD: message " + std::to_string(index) + " does not exist");
+        if (message.pages.empty()) throw Error("MBD: a message needs at least one page");
+        const auto bytes = serialize({message});  // "MBD\0" + the message, contiguous
+        const std::size_t length = bytes.size() - 4, start = starts[index], space = sizes[index];
+        if (length <= space) {
+            std::memcpy(out.data() + start, bytes.data() + 4, length);
+            std::fill(out.begin() + static_cast<std::ptrdiff_t>(start + length),
+                      out.begin() + static_cast<std::ptrdiff_t>(start + space), std::byte{0});
+            continue;
+        }
+        const std::size_t header = 4 + 8 * message.pages.size();
+        if (header > space)
+            throw FormatError("MBD: message " + std::to_string(index) + " has too many pages for its original place (" +
+                              std::to_string(message.pages.size()) + ")");
+        std::fill(out.begin() + static_cast<std::ptrdiff_t>(start), out.begin() + static_cast<std::ptrdiff_t>(start + space),
+                  std::byte{0});
+        set32(start, message.pages.size());
+        for (std::size_t pg = 0; pg < message.pages.size(); ++pg) {
+            set32(start + 4 + 8 * pg, message.pages[pg].size());
+            set32(start + 8 + 8 * pg, out.size() - start);  // the page data goes to the end of the table
+            for (const Token& t : message.pages[pg]) {
+                const std::uint32_t w = static_cast<std::uint32_t>(t.code) | (static_cast<std::uint32_t>(t.arg) << 16);
+                const auto* b = reinterpret_cast<const std::byte*>(&w);
+                out.insert(out.end(), b, b + 4);
+            }
+        }
+    }
+    return out;
+}
+
 Charset Charset::european() {
     Charset c;
     for (int i = 0; i < 26; ++i) {

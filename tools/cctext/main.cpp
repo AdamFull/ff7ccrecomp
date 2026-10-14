@@ -222,27 +222,27 @@ int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir
             throw FormatError("PO: entry " + std::to_string(entry) + " is not a script module");
         const auto data = reader.read(entry);
         atel::Module module = atel::parse(data);
-        std::map<std::size_t, std::vector<mbd::Message>> tables;
+        // Scripts address messages and resources by offset: changed messages are patched in place (mbd::patch) and
+        // the tables replaced without moving other resources (atel::replace_resources).
+        std::map<std::size_t, std::map<std::size_t, mbd::Message>> changes;  // resource -> message -> content
         for (const auto& [k, text] : items) {
             if (k.resource >= module.resources.size() || !mbd::is_mbd(module.resources[k.resource].data))
                 throw FormatError("PO: " + key_string(k) + " is not a text table");
-            auto& table = tables.try_emplace(k.resource, mbd::parse(module.resources[k.resource].data)).first->second;
-            if (k.message >= table.size()) throw FormatError("PO: " + key_string(k) + " is past the end of its table");
+            const auto count = mbd::parse(module.resources[k.resource].data).size();
+            if (k.message >= count) throw FormatError("PO: " + key_string(k) + " is past the end of its table");
             try {
-                table[k.message] = mbd::from_text(text, charset);
+                changes[k.resource][k.message] = mbd::from_text(text, charset);
                 ++changed;
             } catch (const FormatError& e) {
                 ++errors;
                 std::fprintf(stderr, "%s: %s\n", key_string(k).c_str(), e.what());
             }
         }
-        for (auto& [r, table] : tables) {
-            module.resources[r].data = mbd::serialize(table);
-            module.resources[r].slack.clear();  // the serializer re-aligns the next resource
-        }
+        std::map<std::size_t, std::vector<std::byte>> replacements;
+        for (const auto& [r, messages] : changes) replacements[r] = mbd::patch(module.resources[r].data, messages);
         char name[16];
         std::snprintf(name, sizeof name, "%05zu.atel", entry);
-        io::write_all(mod_dir / "pkg" / name, atel::serialize(module));
+        io::write_all(mod_dir / "pkg" / name, atel::replace_resources(data, replacements));
         ++modules;
     }
     std::fprintf(stderr, "%zu messages changed in %zu modules -> %s (%zu errors)\n", changed, modules,
