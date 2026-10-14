@@ -188,12 +188,43 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
     std::map<std::uint64_t, std::size_t> seen;  // key -> first entry
     std::size_t audio_count = 0, movie_count = 0, skipped = 0, duplicates = 0;
 
+    // RIFF ATRAC files stored inside other entries (e.g. containers the game hands to sceAtrac in place).
+    // Each gets its own task holding a copy of the embedded bytes.
+    std::size_t embedded = 0;
+    const auto scan_embedded = [&](std::size_t i) {
+        const auto file = reader.read(i);
+        static constexpr std::byte kRiff[] = {std::byte{'R'}, std::byte{'I'}, std::byte{'F'}, std::byte{'F'}};
+        for (auto it = file.begin(); (it = std::search(it, file.end(), std::begin(kRiff), std::end(kRiff))) != file.end(); ++it) {
+            const std::size_t at = static_cast<std::size_t>(it - file.begin());
+            atrac::Info info;
+            if (!atrac::parse(std::span(file).subspan(at), info)) continue;
+            const std::size_t length = info.data_offset + info.data_size;
+            const std::uint64_t key = cooked::fnv1a64(std::span(file).subspan(at, length));
+            if (!seen.emplace(key, i).second) {
+                ++duplicates;
+                continue;
+            }
+            if (fs::exists(cooked::audio_path(out, key)) && !opt.force) {
+                ++skipped;
+                continue;
+            }
+            ++audio_count;
+            ++embedded;
+            std::vector<std::byte> clip(it, it + static_cast<std::ptrdiff_t>(length));
+            tasks.push_back({"audio " + std::to_string(i) + "+" + std::to_string(at),
+                             [&cooker, i, key, clip = std::move(clip)] { return cooker.cook_audio(i, clip, key); }});
+        }
+    };
+
     std::vector<std::byte> head(2048);
     for (std::size_t i = 0; i < reader.size(); ++i) {
+        if (!opt.entries.empty() && std::find(opt.entries.begin(), opt.entries.end(), i) == opt.entries.end()) continue;
         const pkg::FileType type = reader.sniff(i);
         const bool is_audio = type == pkg::FileType::Riff, is_movie = type == pkg::FileType::Psmf;
-        if (!is_audio && !is_movie) continue;
-        if (!opt.entries.empty() && std::find(opt.entries.begin(), opt.entries.end(), i) == opt.entries.end()) continue;
+        if (!is_audio && !is_movie) {
+            if (opt.only != "movies" && audio_count < opt.limit && type != pkg::FileType::Empty) scan_embedded(i);
+            continue;
+        }
         if ((is_audio && opt.only == "movies") || (is_movie && opt.only == "audio")) continue;
         if ((is_audio ? audio_count : movie_count) >= opt.limit) continue;
 
@@ -232,8 +263,10 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
     }
     // Movies first: they take longest, so the pool stays busy.
     std::stable_partition(tasks.begin(), tasks.end(), [](const Task& t) { return t.label.starts_with("movie"); });
-    std::fprintf(stderr, "cooking %zu audio files and %zu movies with %u jobs (%zu already cooked, %zu duplicates)\n",
-                 audio_count, movie_count, opt.jobs, skipped, duplicates);
+    std::fprintf(stderr,
+                 "cooking %zu audio files (%zu embedded in other entries) and %zu movies with %u jobs "
+                 "(%zu already cooked, %zu duplicates)\n",
+                 audio_count, embedded, movie_count, opt.jobs, skipped, duplicates);
 
     std::atomic<std::size_t> next{0}, done{0}, failed{0};
     std::mutex log;
