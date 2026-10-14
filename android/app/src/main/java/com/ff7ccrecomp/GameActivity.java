@@ -30,6 +30,15 @@ public class GameActivity extends SDLActivity {
                 WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
     }
 
+    /** Called from native code: the panel refresh rate to prefer (0: the device's default). */
+    public void setPreferredRefreshRate(final float hz) {
+        runOnUiThread(() -> {
+            final WindowManager.LayoutParams attributes = getWindow().getAttributes();
+            attributes.preferredRefreshRate = hz;
+            getWindow().setAttributes(attributes);
+        });
+    }
+
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
