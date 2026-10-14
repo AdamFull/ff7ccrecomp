@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "psprecore/error.hpp"
+#include "psprecore/cli.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "psprecore/io/file.hpp"
 #include "psprecore/io/path.hpp"
@@ -23,22 +24,6 @@ namespace {
 
 constexpr nx::string_view kManifestName = "manifest.tsv";
 constexpr nx::string_view kManifestHeader = "# ff7cc-pkg-manifest 1";
-
-void usage() {
-    std::fputs(
-        "usage: ccpkg <command> [args]\n"
-        "\n"
-        "  info    <game>                    summary of the archive by file type\n"
-        "  list    <game>                    one line per file: index, sector, size, type\n"
-        "  extract <game> <out> [--range A-B]\n"
-        "                                    write files to <out>/files and <out>/manifest.tsv\n"
-        "  pack    <extracted> <out>         build <out>/discimg.fse + discimg.pkg from a manifest\n"
-        "  verify  <game-a> <game-b>         compare two archives file by file\n"
-        "\n"
-        "<game> is a disc root, PSP_GAME, USRDIR, or a directory holding discimg.fse/pkg.\n"
-        "Files in an extracted tree may be edited or resized before packing.\n",
-        stderr);
-}
 
 struct Range {
     std::size_t first = 0;
@@ -226,20 +211,32 @@ int cmd_verify(nx::fs::path_view a_dir, nx::fs::path_view b_dir) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    const nx::vector<nx::string_view> args(argv + 1, argv + argc);
-    if (args.empty() || args[0] == "-h" || args[0] == "--help") {
-        usage();
-        return args.empty() ? 2 : 0;
-    }
+    nx::string game, out, range;
+    nx::cli::Parser cli("ccpkg", "The game's archive (discimg.fse + discimg.pkg). <game> is a disc root, PSP_GAME, "
+                                 "USRDIR, or a folder holding the two files; extracted files may be edited or resized "
+                                 "before packing.");
+    cli.command("info", "summary of the archive by file type").positional("game", game, "the game");
+    cli.command("list", "one line per file: index, sector, size, type").positional("game", game, "the game");
+    cli.command("extract", "write the files to <out>/files and <out>/manifest.tsv")
+        .positional("game", game, "the game")
+        .positional("out", out, "output folder")
+        .option("range", range, "only entries A to B", {.value_name = "A-B"});
+    cli.command("pack", "build <out>/discimg.fse + discimg.pkg from an extracted folder")
+        .positional("extracted", game, "folder written by extract")
+        .positional("out", out, "output folder");
+    cli.command("verify", "compare two archives file by file")
+        .positional("game-a", game, "the first game")
+        .positional("game-b", out, "the second game");
+    nx::string command;
+    if (const int code = parse_command_line(cli, argc, argv, &command); code >= 0) return code;
     try {
-        const auto cmd = args[0];
-        if (cmd == "info" && args.size() == 2) return cmd_info(args[1]);
-        if (cmd == "list" && args.size() == 2) return cmd_list(args[1]);
-        if (cmd == "extract" && (args.size() == 3 || (args.size() == 5 && args[3] == "--range")))
-            return cmd_extract(args[1], args[2], args.size() == 5 ? std::optional(args[4]) : std::nullopt);
-        if (cmd == "pack" && args.size() == 3) return cmd_pack(args[1], args[2]);
-        if (cmd == "verify" && args.size() == 3) return cmd_verify(args[1], args[2]);
-        usage();
+        if (command == "info") return cmd_info(game);
+        if (command == "list") return cmd_list(game);
+        if (command == "extract")
+            return cmd_extract(game, out, range.empty() ? std::nullopt : std::optional<nx::string_view>(range));
+        if (command == "pack") return cmd_pack(game, out);
+        if (command == "verify") return cmd_verify(game, out);
+        std::fputs(cli.help().c_str(), stderr);
         return 2;
     } catch (const std::exception& e) {
         std::fprintf(stderr, "ccpkg: %s\n", e.what());

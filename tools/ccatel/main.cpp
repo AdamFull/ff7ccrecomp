@@ -5,6 +5,7 @@
 #include <exception>
 
 #include "psprecore/error.hpp"
+#include "psprecore/cli.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/atel_asm.hpp"
 #include "ff7cc/formats/atel_disasm.hpp"
@@ -23,19 +24,6 @@ namespace {
 
 constexpr nx::string_view kManifestName = "module.txt";
 constexpr nx::string_view kManifestHeader = "# ff7cc-atel-manifest 1";
-
-void usage() {
-    std::fputs(
-        "usage: ccatel <command> [args]\n"
-        "\n"
-        "  info    <file.atel>               header, objects/methods and resources\n"
-        "  strings <file.atel>               every string in the (decrypted) name pool\n"
-        "  disasm  <file.atel> [out.txt]     bytecode listing with labels and resolved names\n"
-        "  unpack  <file.atel> <dir>         module.txt + names.bin + code.asm (editable) + res/\n"
-        "  pack    <dir> <file.atel>         rebuild a module from an unpacked directory\n"
-        "  verify  <file-or-dir>...          check container, bytecode and listing round trips are byte-exact\n",
-        stderr);
-}
 
 nx::string hex(std::span<const std::byte> bytes) {
     static constexpr char kDigits[] = "0123456789abcdef";
@@ -319,22 +307,36 @@ int cmd_verify(const nx::vector<nx::string_view>& inputs) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    const nx::vector<nx::string_view> args(argv + 1, argv + argc);
-    if (args.empty() || args[0] == "-h" || args[0] == "--help") {
-        usage();
-        return args.empty() ? 2 : 0;
-    }
+    nx::string file, out;
+    nx::vector<nx::string> inputs;
+    nx::cli::Parser cli("ccatel", "The game's Atel script modules (*.atel).");
+    cli.command("info", "header, objects/methods and resources").positional("file", file, "the module");
+    cli.command("strings", "every string in the (decrypted) name pool").positional("file", file, "the module");
+    cli.command("disasm", "bytecode listing with labels and resolved names")
+        .positional("file", file, "the module")
+        .positional("out", out, "listing to write (default: standard output)", {.required = false});
+    cli.command("unpack", "module.txt + names.bin + code.asm (editable) + res/")
+        .positional("file", file, "the module")
+        .positional("dir", out, "output folder");
+    cli.command("pack", "rebuild a module from an unpacked folder")
+        .positional("dir", file, "folder written by unpack")
+        .positional("file", out, "the module to write");
+    cli.command("verify", "check that container, bytecode and listing round trips are byte-exact")
+        .positional_many("inputs", inputs, "modules or folders of modules");
+    nx::string command;
+    if (const int code = parse_command_line(cli, argc, argv, &command); code >= 0) return code;
     try {
-        const auto cmd = args[0];
-        if (cmd == "info" && args.size() == 2) return cmd_info(args[1]);
-        if (cmd == "strings" && args.size() == 2) return cmd_strings(args[1]);
-        if (cmd == "disasm" && (args.size() == 2 || args.size() == 3))
-            return cmd_disasm(args[1], args.size() == 3 ? args[2] : nx::string_view());
-        if (cmd == "unpack" && args.size() == 3) return cmd_unpack(args[1], args[2]);
-        if (cmd == "pack" && args.size() == 3) return cmd_pack(args[1], args[2]);
-        if (cmd == "verify" && args.size() >= 2)
-            return cmd_verify(nx::vector<nx::string_view>(args.begin() + 1, args.end()));
-        usage();
+        if (command == "info") return cmd_info(file);
+        if (command == "strings") return cmd_strings(file);
+        if (command == "disasm") return cmd_disasm(file, out);
+        if (command == "unpack") return cmd_unpack(file, out);
+        if (command == "pack") return cmd_pack(file, out);
+        if (command == "verify") {
+            nx::vector<nx::string_view> views;
+            for (const auto& i : inputs) views.push_back(i);
+            return cmd_verify(views);
+        }
+        std::fputs(cli.help().c_str(), stderr);
         return 2;
     } catch (const std::exception& e) {
         std::fprintf(stderr, "ccatel: %s\n", e.what());

@@ -11,6 +11,7 @@
 #include <optional>
 
 #include "psprecore/error.hpp"
+#include "psprecore/cli.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/mbd.hpp"
 #include "ff7cc/formats/pkg.hpp"
@@ -25,14 +26,6 @@
 using namespace ff7cc;
 
 namespace {
-
-void usage() {
-    std::fputs(
-        "usage: cctext export <game> <out.po>\n"
-        "       cctext build  <game> <in.po> <mod dir>\n"
-        "       cctext verify <game>\n",
-        stderr);
-}
 
 struct Key {
     std::size_t entry = 0, resource = 0, message = 0;
@@ -258,12 +251,23 @@ int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view m
 }  // namespace
 
 int main(int argc, char** argv) {
+    nx::string game, po, mod_dir;
+    nx::cli::Parser cli("cctext", "The game's dialogue and menu text as gettext PO files (see docs/localization.md).");
+    cli.command("export", "every message; msgctxt \"EEEEE.RR.MMM\" = entry, resource, message")
+        .positional("game", game, "the game")
+        .positional("out", po, "PO file to write");
+    cli.command("build", "modules whose translated text differs -> <mod dir>/pkg/EEEEE.atel")
+        .positional("game", game, "the game")
+        .positional("po", po, "translated PO file")
+        .positional("mod-dir", mod_dir, "mod folder to write");
+    cli.command("verify", "binary and text round trips of every message").positional("game", game, "the game");
+    nx::string command;
+    if (const int code = parse_command_line(cli, argc, argv, &command); code >= 0) return code;
     try {
-        const nx::string_view cmd = argc > 1 ? argv[1] : "";
-        if (cmd == "export" && argc == 4) return export_po(argv[2], argv[3]);
-        if (cmd == "build" && argc == 5) return build(argv[2], argv[3], argv[4]);
-        if (cmd == "verify" && argc == 3) return verify(argv[2]);
-        usage();
+        if (command == "export") return export_po(game, po);
+        if (command == "build") return build(game, po, mod_dir);
+        if (command == "verify") return verify(game);
+        std::fputs(cli.help().c_str(), stderr);
         return 2;
     } catch (const std::exception& e) {
         std::fprintf(stderr, "cctext: %s\n", e.what());

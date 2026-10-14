@@ -9,6 +9,7 @@
 #include <exception>
 
 #include "psprecore/error.hpp"
+#include "psprecore/cli.hpp"
 #include "psprecore/formats/atrac.hpp"
 #include "psprecore/formats/cooked.hpp"
 #include "ff7cc/formats/pkg.hpp"
@@ -28,24 +29,6 @@
 using namespace ff7cc;
 
 namespace {
-
-void usage() {
-    std::fputs(
-        "usage: cccook <game> <out> [options]\n"
-        "\n"
-        "Converts ATRAC3/ATRAC3plus audio to Ogg Vorbis and PSMF movies to AV1 (IVF) + Ogg Vorbis.\n"
-        "Existing outputs are kept, so an interrupted run can be resumed.\n"
-        "\n"
-        "  --ffmpeg PATH     FFmpeg executable (default: ffmpeg on PATH)\n"
-        "  --jobs N          parallel FFmpeg processes (default: half the CPU threads)\n"
-        "  --only KIND       audio | movies\n"
-        "  --limit N         cook at most N files of each kind (testing)\n"
-        "  --entry N         cook only archive entry N (repeatable)\n"
-        "  --force           overwrite existing outputs\n"
-        "  --audio-quality Q Vorbis quality 0-10 (default 6)\n"
-        "  --video-crf N     SVT-AV1 CRF (default 26)\n",
-        stderr);
-}
 
 struct Options {
     nx::string ffmpeg = "ffmpeg";
@@ -298,30 +281,26 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 3) {
-        usage();
-        return 2;
-    }
+    Options opt;
+    nx::string game, out;
+    nx::cli::Parser cli("cccook", "Converts ATRAC3/ATRAC3plus audio to Ogg Vorbis and PSMF movies to AV1 (IVF) + Ogg "
+                                  "Vorbis. Existing outputs are kept, so an interrupted run can be resumed.");
+    cli.root()
+        .positional("game", game, "the game (extracted disc folder)")
+        .positional("out", out, "cooked media folder")
+        .option("ffmpeg", opt.ffmpeg, "FFmpeg executable (default: ffmpeg on PATH)", {.value_name = "PATH"})
+        .option("jobs", opt.jobs, "parallel FFmpeg processes (default: half the CPU threads)", {.value_name = "N"})
+        .option("only", opt.only, "cook one kind only", {.value_name = "KIND", .choices = {"audio", "movies"}})
+        .option("limit", opt.limit, "cook at most N files of each kind (testing)", {.value_name = "N"})
+        .option_many("entry", opt.entries, "cook only archive entry N (repeatable)", {.value_name = "N"})
+        .flag("force", opt.force, "overwrite existing outputs")
+        .flag("keep-temp", opt.keep_temp, "keep FFmpeg's intermediate files")
+        .option("audio-quality", opt.audio_quality, "Vorbis quality 0-10 (default: 6)", {.value_name = "Q"})
+        .option("video-crf", opt.video_crf, "SVT-AV1 CRF (default: 26)", {.value_name = "N"});
+    if (const int code = parse_command_line(cli, argc, argv); code >= 0) return code;
     try {
-        Options opt;
-        for (int i = 3; i < argc; ++i) {
-            const nx::string_view a = argv[i];
-            const auto next = [&]() -> nx::string_view {
-                if (i + 1 >= argc) throw Error(nx::string("missing value for ") + a);
-                return argv[++i];
-            };
-            if (a == "--ffmpeg") opt.ffmpeg = next();
-            else if (a == "--jobs") opt.jobs = std::max(1u, static_cast<unsigned>(parse_u64(next())));
-            else if (a == "--only") opt.only = next();
-            else if (a == "--limit") opt.limit = parse_u64(next());
-            else if (a == "--entry") opt.entries.push_back(parse_u64(next()));
-            else if (a == "--force") opt.force = true;
-            else if (a == "--keep-temp") opt.keep_temp = true;
-            else if (a == "--audio-quality") opt.audio_quality = static_cast<int>(parse_i64(next()));
-            else if (a == "--video-crf") opt.video_crf = static_cast<int>(parse_i64(next()));
-            else throw Error(nx::string("unknown option ") + a);
-        }
-        return cook(argv[1], argv[2], opt);
+        opt.jobs = std::max(1u, opt.jobs);
+        return cook(game, out, opt);
     } catch (const std::exception& e) {
         std::fprintf(stderr, "cccook: %s\n", e.what());
         return 1;
