@@ -109,7 +109,7 @@ to logcat (tag `ff7cc`) and `ff7cc.log` in the same folder; test options can be 
 `adb shell am start -n com.ff7ccrecomp/.GameActivity -e args "--perf"`.
 
 Esc or F1 (gamepad: Guide, or both stick clicks) opens the pause menu: renderer (Vulkan or the software
-reference, switched when the menu closes), internal resolution, anti-aliasing (MSAA), fullscreen (also F11 / Alt+Enter), volume, frame limiter, VSync, on Android a 60 Hz display mode (saves battery on 120 Hz phones) and an FPS counter. Settings are kept in `ff7cc.ini` in the
+reference, switched when the menu closes), internal resolution, anti-aliasing (MSAA), fullscreen (also F11 / Alt+Enter), volume, frame limiter, VSync, button glyphs (PlayStation / Xbox / Nintendo, by default those of the pad in use), on Android a 60 Hz display mode (saves battery on 120 Hz phones) and an FPS counter. Settings are kept in `ff7cc.ini` in the
 working directory. Saves go to `saves/`; the game's save and load screens open a slot picker.
 
 The NID database is generated locally and not committed. `tools/analysis/nids_from_ppsspp.py` fills the
