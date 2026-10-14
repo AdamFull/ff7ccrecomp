@@ -117,6 +117,10 @@ Esc or F1 (gamepad: Guide, or both stick clicks) opens the pause menu: renderer 
 reference, switched when the menu closes), internal resolution, anti-aliasing (MSAA), fullscreen (also F11 / Alt+Enter), volume, frame limiter, VSync, button glyphs (PlayStation / Xbox / Nintendo, by default those of the pad in use), on Android a 60 Hz display mode (saves battery on 120 Hz phones) and an FPS counter. Settings are kept in `ff7cc.ini` in the
 working directory. Saves go to `saves/`; the game's save and load screens open a slot picker.
 
+Movies can be skipped: pressing any button during one shows a "Hold to skip" prompt, and holding Circle (B on Xbox,
+A on Nintendo, L on the keyboard; on a touch screen, a finger on the picture) for under a second skips it. The
+opening movie behind the title screen is not skippable (Start opens the title menu there).
+
 The NID database is generated locally and not committed. `tools/analysis/nids_from_ppsspp.py` fills the
 names the homebrew SDK lacks (e.g. `sceSasCore`) from a PPSSPP debug log.
 
