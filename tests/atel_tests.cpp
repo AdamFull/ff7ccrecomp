@@ -1,18 +1,18 @@
 #include <algorithm>
 #include <cstring>
-#include <string_view>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "test_main.hpp"
 #include "core/foundation/core/foundation.h"
+#include "core/foundation/strings/utf8_string.h"
 
 using namespace ff7cc;
 using namespace std::string_view_literals;
 
 namespace {
 
-nx::vector<std::byte> bytes(std::string_view text) {
+nx::vector<std::byte> bytes(nx::string_view text) {
     nx::vector<std::byte> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
@@ -21,7 +21,7 @@ nx::vector<std::byte> bytes(std::string_view text) {
 atel::Module sample_module() {
     atel::Module m;
     m.seed = 0x47FED3BA;
-    m.names = bytes(std::string_view("Root\0init\0main\0Director\0", 25));
+    m.names = bytes(nx::string_view("Root\0init\0main\0Director\0", 25));
     m.code = bytes("\x10\x00\x00\x00\x10\x2e\x06\x09\x00\x00\x00\x00\x17"sv);  // 13 bytes, arbitrary
     atel::Object director;
     director.name = 15;  // "Director"
@@ -39,11 +39,11 @@ atel::Module sample_module() {
 
 TEST_CASE("atel name cipher matches the game LCG") {
     // "Root\0" encrypted with seed 0x47FED3BA, as stored at the start of the archive header module.
-    auto names = bytes(std::string_view("Root\0", 5));
+    auto names = bytes(nx::string_view("Root\0", 5));
     atel::crypt_names(names, 0x47FED3BA);
     CHECK(names == bytes("\x8c\x13\x43\x6f\x59"));
     atel::crypt_names(names, 0x47FED3BA);
-    CHECK(names == bytes(std::string_view("Root\0", 5)));
+    CHECK(names == bytes(nx::string_view("Root\0", 5)));
 }
 
 TEST_CASE("atel serialize/parse round-trip") {
@@ -100,7 +100,7 @@ TEST_CASE("atel rejects malformed input") {
 }
 
 TEST_CASE("atel resource type tags") {
-    CHECK(atel::resource_type(bytes(std::string_view("MBD\0", 4))) == "mbd");
+    CHECK(atel::resource_type(bytes(nx::string_view("MBD\0", 4))) == "mbd");
     CHECK(atel::resource_type(bytes("SSCF")) == "sscf");
     CHECK(atel::resource_type(bytes("RIFF")) == "at3");
     CHECK(atel::resource_type(bytes("GT\x00\x02"sv)) == "bin");

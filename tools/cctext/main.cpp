@@ -8,22 +8,20 @@
 
 #include <cstdio>
 #include <exception>
-#include <filesystem>
-#include <fstream>
 #include <optional>
-#include <sstream>
-#include <string>
-#include <string_view>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/mbd.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "ff7cc/io/file.hpp"
+#include "ff7cc/io/path.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/platform/filesystem.h"
+#include "core/foundation/strings/format.h"
+#include "core/foundation/strings/utf8_string.h"
 
-namespace fs = std::filesystem;
 using namespace ff7cc;
 
 namespace {
@@ -41,15 +39,15 @@ struct Key {
     auto operator<=>(const Key&) const = default;
 };
 
-std::string key_string(const Key& k) {
+nx::string key_string(const Key& k) {
     char buf[32];
     std::snprintf(buf, sizeof buf, "%05zu.%02zu.%03zu", k.entry, k.resource, k.message);
     return buf;
 }
 
-std::optional<Key> parse_key(std::string_view s) {
+std::optional<Key> parse_key(nx::string_view s) {
     Key k;
-    if (std::sscanf(std::string(s).c_str(), "%zu.%zu.%zu", &k.entry, &k.resource, &k.message) != 3) return std::nullopt;
+    if (std::sscanf(nx::string(s).c_str(), "%zu.%zu.%zu", &k.entry, &k.resource, &k.message) != 3) return std::nullopt;
     return k;
 }
 
@@ -67,8 +65,8 @@ void for_each_table(pkg::Reader& reader, Fn&& fn) {
 
 // ---- PO files ------------------------------------------------------------------------------------------------
 
-std::string po_escape(std::string_view s) {
-    std::string out;
+nx::string po_escape(nx::string_view s) {
+    nx::string out;
     for (const char c : s) {
         switch (c) {
             case '\\': out += "\\\\"; break;
@@ -82,21 +80,21 @@ std::string po_escape(std::string_view s) {
 }
 
 // A PO string: one line, or "" followed by one line per text line when it has newlines.
-std::string po_string(std::string_view s) {
-    if (s.find('\n') == std::string_view::npos || s.find('\n') == s.size() - 1) return "\"" + po_escape(s) + "\"";
-    std::string out = "\"\"";
+nx::string po_string(nx::string_view s) {
+    if (s.find('\n') == nx::string_view::npos || s.find('\n') == s.size() - 1) return "\"" + po_escape(s) + "\"";
+    nx::string out = "\"\"";
     std::size_t start = 0;
     while (start < s.size()) {
         const std::size_t nl = s.find('\n', start);
-        const std::size_t end = nl == std::string_view::npos ? s.size() : nl + 1;
+        const std::size_t end = nl == nx::string_view::npos ? s.size() : nl + 1;
         out += "\n\"" + po_escape(s.substr(start, end - start)) + "\"";
         start = end;
     }
     return out;
 }
 
-std::string po_unescape(std::string_view s) {
-    std::string out;
+nx::string po_unescape(nx::string_view s) {
+    nx::string out;
     for (std::size_t i = 0; i < s.size(); ++i) {
         if (s[i] != '\\' || i + 1 >= s.size()) {
             out += s[i];
@@ -112,27 +110,33 @@ std::string po_unescape(std::string_view s) {
 }
 
 struct PoEntry {
-    std::string context, id, str;
+    nx::string context, id, str;
 };
 
-nx::vector<PoEntry> read_po(const fs::path& path) {
-    std::ifstream in(path, std::ios::binary);
-    if (!in) throw IoError("cannot read " + path.string());
+nx::vector<PoEntry> read_po(nx::fs::path_view path) {
+    const auto file = nx::fs::file_read_text(path);
+    if (!file) throw IoError(nx::string("cannot read ") + path.native());
     nx::vector<PoEntry> out;
     PoEntry cur;
-    std::string* field = nullptr;
+    nx::string* field = nullptr;
     const auto flush = [&] {
         if (!cur.context.empty() || !cur.id.empty()) out.push_back(cur);
         cur = PoEntry{};
         field = nullptr;
     };
-    const auto quoted = [](std::string_view line) {
+    const auto quoted = [](nx::string_view line) {
         const auto a = line.find('"'), b = line.rfind('"');
-        if (a == std::string_view::npos || b <= a) throw FormatError("PO: expected a quoted string: " + std::string(line));
+        if (a == nx::string_view::npos || b <= a)
+            throw FormatError(nx::string("PO: expected a quoted string: ") + line);
         return po_unescape(line.substr(a + 1, b - a - 1));
     };
-    for (std::string line; std::getline(in, line);) {
-        if (!line.empty() && line.back() == '\r') line.pop_back();
+    const nx::string_view text = file.value();
+    for (std::size_t pos = 0; pos < text.size();) {
+        const std::size_t nl = text.find('\n', pos);
+        const std::size_t end = nl == nx::string_view::npos ? text.size() : nl;
+        nx::string_view line = text.substr(pos, end - pos);
+        pos = end + 1;
+        if (line.ends_with('\r')) line.remove_suffix(1);
         if (line.empty()) {
             flush();
             continue;
@@ -158,27 +162,27 @@ nx::vector<PoEntry> read_po(const fs::path& path) {
 
 // ---- commands ------------------------------------------------------------------------------------------------
 
-int export_po(const fs::path& game, const fs::path& out_path) {
+int export_po(nx::fs::path_view game, nx::fs::path_view out_path) {
     pkg::Reader reader(pkg::locate(game));
     const auto charset = mbd::Charset::european();
-    std::ofstream out(out_path, std::ios::binary);
-    if (!out) throw IoError("cannot write " + out_path.string());
-    out << "# Crisis Core -Final Fantasy VII- text (FF7CCRECOMP cctext). msgctxt: archive entry.resource.message\n"
-           "msgid \"\"\nmsgstr \"\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n";
+    nx::string out =
+        "# Crisis Core -Final Fantasy VII- text (FF7CCRECOMP cctext). msgctxt: archive entry.resource.message\n"
+        "msgid \"\"\nmsgstr \"\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n";
     std::size_t messages = 0, tables = 0;
     for_each_table(reader, [&](std::size_t entry, const atel::Module&, std::size_t r, const nx::vector<mbd::Message>& table) {
         ++tables;
         for (std::size_t m = 0; m < table.size(); ++m) {
-            out << "\nmsgctxt \"" << key_string({entry, r, m}) << "\"\nmsgid " << po_string(mbd::to_text(table[m], charset))
-                << "\nmsgstr \"\"\n";
+            out += "\nmsgctxt \"" + key_string({entry, r, m}) + "\"\nmsgid " + po_string(mbd::to_text(table[m], charset)) +
+                   "\nmsgstr \"\"\n";
             ++messages;
         }
     });
-    std::fprintf(stderr, "%zu messages from %zu tables -> %s\n", messages, tables, out_path.string().c_str());
+    if (!nx::fs::file_write_text(out_path, out)) throw IoError(nx::string("cannot write ") + out_path.native());
+    std::fprintf(stderr, "%zu messages from %zu tables -> %s\n", messages, tables, nx::string(out_path.native()).c_str());
     return 0;
 }
 
-int verify(const fs::path& game) {
+int verify(nx::fs::path_view game) {
     pkg::Reader reader(pkg::locate(game));
     const auto charset = mbd::Charset::european();
     std::size_t tables = 0, messages = 0, failures = 0, unnamed = 0;
@@ -189,8 +193,8 @@ int verify(const fs::path& game) {
             std::fprintf(stderr, "binary round trip differs: entry %zu resource %zu\n", entry, r);
         }
         for (std::size_t m = 0; m < table.size(); ++m, ++messages) {
-            const std::string text = mbd::to_text(table[m], charset);
-            if (text.find("{G:") != std::string::npos) ++unnamed;
+            const nx::string text = mbd::to_text(table[m], charset);
+            if (text.contains("{G:")) ++unnamed;
             if (mbd::from_text(text, charset) != table[m]) {
                 ++failures;
                 std::fprintf(stderr, "text round trip differs: %s\n", key_string({entry, r, m}).c_str());
@@ -202,9 +206,9 @@ int verify(const fs::path& game) {
     return failures ? 1 : 0;
 }
 
-int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir) {
+int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view mod_dir) {
     const auto charset = mbd::Charset::european();
-    nx::map<Key, std::string> translated;
+    nx::map<Key, nx::string> translated;
     for (const auto& e : read_po(po_path)) {
         if (e.context.empty() || e.str.empty() || e.str == e.id) continue;
         const auto key = parse_key(e.context);
@@ -212,14 +216,15 @@ int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir
         translated[*key] = e.str;
     }
     pkg::Reader reader(pkg::locate(game));
-    nx::map<std::size_t, nx::vector<std::pair<Key, std::string>>> by_entry;
+    nx::map<std::size_t, nx::vector<std::pair<Key, nx::string>>> by_entry;
     for (const auto& [k, s] : translated) by_entry[k.entry].emplace_back(k, s);
 
-    fs::create_directories(mod_dir / "pkg");
+    const nx::string pkg_dir = path_join(mod_dir.native(), "pkg");
+    if (!nx::fs::create_directories(pkg_dir)) throw IoError("cannot create directory '" + pkg_dir + "'");
     std::size_t modules = 0, changed = 0, errors = 0;
     for (const auto& [entry, items] : by_entry) {
         if (entry >= reader.size() || reader.sniff(entry) != pkg::FileType::Atel)
-            throw FormatError("PO: entry " + std::to_string(entry) + " is not a script module");
+            throw FormatError("PO: entry " + nx::format("{}", entry) + " is not a script module");
         const auto data = reader.read(entry);
         atel::Module module = atel::parse(data);
         // Scripts address messages and resources by offset: changed messages are patched in place (mbd::patch) and
@@ -242,11 +247,11 @@ int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir
         for (const auto& [r, messages] : changes) replacements[r] = mbd::patch(module.resources[r].data, messages);
         char name[16];
         std::snprintf(name, sizeof name, "%05zu.atel", entry);
-        io::write_all(mod_dir / "pkg" / name, atel::replace_resources(data, replacements));
+        io::write_all(path_join(pkg_dir, name), atel::replace_resources(data, replacements));
         ++modules;
     }
     std::fprintf(stderr, "%zu messages changed in %zu modules -> %s (%zu errors)\n", changed, modules,
-                 (mod_dir / "pkg").string().c_str(), errors);
+                 pkg_dir.c_str(), errors);
     return errors ? 1 : 0;
 }
 
@@ -254,7 +259,7 @@ int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir
 
 int main(int argc, char** argv) {
     try {
-        const std::string_view cmd = argc > 1 ? argv[1] : "";
+        const nx::string_view cmd = argc > 1 ? argv[1] : "";
         if (cmd == "export" && argc == 4) return export_po(argv[2], argv[3]);
         if (cmd == "build" && argc == 5) return build(argv[2], argv[3], argv[4]);
         if (cmd == "verify" && argc == 3) return verify(argv[2]);

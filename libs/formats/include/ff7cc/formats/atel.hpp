@@ -27,10 +27,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
-#include <string_view>
 
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/strings/utf8_string.h"
 
 namespace ff7cc::atel {
 
@@ -74,7 +74,7 @@ struct Module {
     nx::vector<Resource> resources;
 
     // NUL-terminated string at `offset` in the name pool (Shift-JIS for non-ASCII text).
-    std::string_view name_at(std::uint32_t offset) const;
+    nx::string_view name_at(std::uint32_t offset) const;
 
     friend bool operator==(const Module&, const Module&) = default;
 };
@@ -96,6 +96,6 @@ nx::vector<std::byte> replace_resources(std::span<const std::byte> module,
 void crypt_names(std::span<std::byte> names, std::uint32_t seed);
 
 // Short type tag for a resource from its leading bytes (e.g. "mbd", "sscf"); "bin" if unknown.
-std::string_view resource_type(std::span<const std::byte> data);
+nx::string_view resource_type(std::span<const std::byte> data);
 
 }  // namespace ff7cc::atel

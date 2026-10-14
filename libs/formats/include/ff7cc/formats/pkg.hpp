@@ -12,12 +12,12 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <filesystem>
 #include <span>
-#include <string_view>
 
 #include "ff7cc/io/file.hpp"
+#include "ff7cc/io/path.hpp"
 #include "core/foundation/core/foundation.h"
+#include "core/foundation/strings/utf8_string.h"
 
 namespace ff7cc::pkg {
 
@@ -46,20 +46,20 @@ enum class FileType : std::uint8_t { Empty, Atel, Riff, Psmf, Sscf, Unknown };
 
 // Identifies a file from its first bytes (pass at least 16 when available).
 FileType sniff(std::span<const std::byte> head);
-std::string_view type_name(FileType type);       // e.g. "atel"
-std::string_view type_extension(FileType type);  // e.g. ".atel"
+nx::string_view type_name(FileType type);       // e.g. "atel"
+nx::string_view type_extension(FileType type);  // e.g. ".atel"
 // Inverse of type_name(); returns Unknown for unrecognised names.
-FileType type_from_name(std::string_view name);
+FileType type_from_name(nx::string_view name);
 
 struct ArchivePaths {
-    std::filesystem::path fse;
-    std::filesystem::path pkg;
+    nx::string fse;
+    nx::string pkg;
 };
 
 // Finds discimg.fse/pkg given a disc root, PSP_GAME, USRDIR, or the directory holding them.
-ArchivePaths locate(const std::filesystem::path& dir);
+ArchivePaths locate(nx::fs::path_view dir);
 // Paths for writing a new archive into `dir`.
-ArchivePaths output_paths(const std::filesystem::path& dir);
+ArchivePaths output_paths(nx::fs::path_view dir);
 
 class Reader {
 public:
@@ -92,7 +92,7 @@ public:
     // Appends the next file (index = number of files added so far).
     void add(std::span<const std::byte> data);
     void add_from(io::File& src, std::uint64_t offset, std::uint64_t size);
-    void add_file(const std::filesystem::path& path);
+    void add_file(nx::fs::path_view path);
     // Writes the index and closes both files. Must be called once all files are added.
     void finish();
 

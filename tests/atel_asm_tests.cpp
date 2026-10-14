@@ -1,7 +1,5 @@
 #include <bit>
 #include <cstring>
-#include <string>
-#include <string_view>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
@@ -10,13 +8,14 @@
 #include "ff7cc/formats/atel_vm.hpp"
 #include "test_main.hpp"
 #include "core/foundation/core/foundation.h"
+#include "core/foundation/strings/utf8_string.h"
 
 using namespace ff7cc;
 using namespace std::string_view_literals;
 
 namespace {
 
-nx::vector<std::byte> bytes(std::string_view text) {
+nx::vector<std::byte> bytes(nx::string_view text) {
     nx::vector<std::byte> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
@@ -81,12 +80,12 @@ TEST_CASE("atel asm: disassembly re-assembles byte for byte") {
 TEST_CASE("atel asm: errors carry line numbers and leave the module untouched") {
     auto m = module_with_method();
     const auto before = m;
-    const auto expect_error = [&](std::string_view listing, std::string_view needle) {
+    const auto expect_error = [&](nx::string_view listing, nx::string_view needle) {
         try {
             atel::assemble_into(m, listing);
             CHECK(!"expected FormatError");
         } catch (const FormatError& e) {
-            CHECK(std::string(e.what()).find(needle) != std::string::npos);
+            CHECK(nx::string(e.what()).find(needle) != nx::string::npos);
         }
         CHECK(m == before);
     };

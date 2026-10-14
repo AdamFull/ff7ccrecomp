@@ -15,9 +15,9 @@
 #include <cstdint>
 #include <optional>
 #include <span>
-#include <string_view>
 
 #include "core/foundation/core/foundation.h"
+#include "core/foundation/strings/utf8_string.h"
 
 namespace ff7cc::atel {
 
@@ -33,7 +33,7 @@ enum class OperandKind : std::uint8_t {
 };
 
 struct OpcodeInfo {
-    std::string_view mnemonic;
+    nx::string_view mnemonic;
     OperandKind operand = OperandKind::None;
 };
 
@@ -41,7 +41,7 @@ inline constexpr std::size_t kOpcodeCount = 98;
 inline constexpr std::uint8_t kOpCallNative = 0x29;
 
 const OpcodeInfo& opcode_info(std::uint8_t opcode);  // throws FormatError for opcodes >= kOpcodeCount
-std::optional<std::uint8_t> opcode_from_mnemonic(std::string_view mnemonic);
+std::optional<std::uint8_t> opcode_from_mnemonic(nx::string_view mnemonic);
 
 // Operands of opcode 0x29: 29 <name u32> <has_result u8> <type_count u8> <pop_slots s16> <types u16[type_count]>.
 // The loader replaces `name` (a name-pool offset such as "MapJump") with the native function address.

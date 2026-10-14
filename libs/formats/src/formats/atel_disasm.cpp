@@ -9,39 +9,41 @@
 #include "ff7cc/formats/atel_vm.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/strings/utf8_string.h"
+#include "core/foundation/strings/format.h"
 
 namespace ff7cc::atel {
 
 namespace {
 
-std::string hex4(std::uint32_t v) {
+nx::string hex4(std::uint32_t v) {
     char buf[16];
     std::snprintf(buf, sizeof buf, "%04X", v);
     return buf;
 }
 
-std::string format_float(float f) {
+nx::string format_float(float f) {
     char buf[32];
     if (!std::isfinite(f)) {  // NaN payloads and infinities as raw bits so the assembler reproduces them exactly
         std::snprintf(buf, sizeof buf, "bits(0x%08x)", std::bit_cast<std::uint32_t>(f));
         return buf;
     }
     const auto [end, ec] = std::to_chars(buf, buf + sizeof buf, f);
-    std::string s(buf, ec == std::errc{} ? end : buf);
-    if (s.find_first_of(".eEn") == std::string::npos) s += ".0";  // keep floats visibly floats
+    nx::string s(buf, static_cast<std::size_t>((ec == std::errc{} ? end : buf) - buf));
+    if (s.view().find_first_of(".eEn") == nx::string_view::npos) s += ".0";  // keep floats visibly floats
     return s;
 }
 
-std::string name_literal(const Module& m, std::int32_t offset) {
+nx::string name_literal(const Module& m, std::int32_t offset) {
     if (offset < 0 || static_cast<std::size_t>(offset) >= m.names.size())
-        return "<bad name offset " + std::to_string(offset) + ">";
+        return "<bad name offset " + nx::format("{}", offset) + ">";
     return quote(m.name_at(static_cast<std::uint32_t>(offset)));
 }
 
 }  // namespace
 
-std::string quote(std::string_view s) {
-    std::string out = "\"";
+nx::string quote(nx::string_view s) {
+    nx::string out = "\"";
     for (unsigned char c : s) {
         if (c == '"' || c == '\\') {
             out += '\\';
@@ -57,15 +59,15 @@ std::string quote(std::string_view s) {
     return out + "\"";
 }
 
-std::string disassemble(const Module& m) {
+nx::string disassemble(const Module& m) {
     const auto insns = decode_all(m.code);
 
     // Labels: method entry points first, then call and jump targets.
-    nx::map<std::uint32_t, nx::vector<std::string>> labels;
+    nx::map<std::uint32_t, nx::vector<nx::string>> labels;
     for (const auto& obj : m.objects)
         for (const auto& method : obj.methods)
-            labels[method.code_offset].push_back(std::string(m.name_at(obj.name)) + "." +
-                                                 std::string(m.name_at(method.name)));
+            labels[method.code_offset].push_back(nx::string(m.name_at(obj.name)) + "." +
+                                                 nx::string(m.name_at(method.name)));
     nx::set<std::uint32_t> calls, jumps;
     for (const auto& insn : insns) {
         if (opcode_info(insn.opcode).operand != OperandKind::Code) continue;
@@ -85,15 +87,15 @@ std::string disassemble(const Module& m) {
     if (!labels.contains(0)) labels[0].push_back("sub_0000");
     const auto label_of = [&](std::int32_t target) {
         const auto it = labels.find(static_cast<std::uint32_t>(target));
-        return it != labels.end() ? it->second.front() : "<bad target " + std::to_string(target) + ">";
+        return it != labels.end() ? it->second.front() : "<bad target " + nx::format("{}", target) + ">";
     };
 
-    std::string out;
+    nx::string out;
     char buf[64];
     std::snprintf(buf, sizeof buf, "; Atel module, seed 0x%08x\n", m.seed);
     out += buf;
-    out += "; " + std::to_string(m.objects.size()) + " objects, " + std::to_string(m.code.size()) +
-           " bytes of code, " + std::to_string(insns.size()) + " instructions\n";
+    out += "; " + nx::format("{}", m.objects.size()) + " objects, " + nx::format("{}", m.code.size()) +
+           " bytes of code, " + nx::format("{}", insns.size()) + " instructions\n";
 
     for (const auto& insn : insns) {
         if (const auto it = labels.find(insn.offset); it != labels.end()) {
@@ -101,19 +103,19 @@ std::string disassemble(const Module& m) {
             for (const auto& l : it->second) out += l + ":\n";
         }
         const auto& info = opcode_info(insn.opcode);
-        std::string line = "    " + hex4(insn.offset) + "  " + std::string(info.mnemonic);
-        std::string operand;
+        nx::string line = "    " + hex4(insn.offset) + "  " + nx::string(info.mnemonic);
+        nx::string operand;
         switch (info.operand) {
             case OperandKind::None: break;
             case OperandKind::I8:
             case OperandKind::I16:
-            case OperandKind::I32: operand = std::to_string(insn.imm); break;
+            case OperandKind::I32: operand = nx::format("{}", insn.imm); break;
             case OperandKind::F32: operand = format_float(insn.fimm); break;
             case OperandKind::Name: operand = name_literal(m, insn.imm); break;
             case OperandKind::Code: operand = label_of(insn.imm); break;
             case OperandKind::NativeCall: {
                 operand = name_literal(m, static_cast<std::int32_t>(insn.call.name)) +
-                          ", pop=" + std::to_string(insn.call.pop_slots) +
+                          ", pop=" + nx::format("{}", insn.call.pop_slots) +
                           (insn.call.has_result ? ", ret" : "");
                 if (!insn.call.types.empty()) {
                     operand += ", types=[";

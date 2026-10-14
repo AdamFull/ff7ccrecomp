@@ -5,6 +5,8 @@
 #include "ff7cc/error.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/strings/utf8_string.h"
+#include "core/foundation/strings/format.h"
 
 namespace ff7cc::mbd {
 
@@ -22,14 +24,14 @@ void put32(nx::vector<std::byte>& out, std::uint32_t v) {
     out.insert(out.end(), b, b + 4);
 }
 
-std::string hex(unsigned v, int digits) {
+nx::string hex(unsigned v, int digits) {
     static constexpr char kDigits[] = "0123456789ABCDEF";
-    std::string s(static_cast<std::size_t>(digits), '0');
+    nx::string s(static_cast<std::size_t>(digits), '0');
     for (int i = digits - 1; i >= 0; --i, v >>= 4) s[static_cast<std::size_t>(i)] = kDigits[v & 15];
     return s;
 }
 
-unsigned parse_number(std::string_view s, int base) {
+unsigned parse_number(nx::string_view s, int base) {
     if (s.empty()) throw FormatError("MBD text: empty number in a tag");
     unsigned v = 0;
     for (const char c : s) {
@@ -37,7 +39,7 @@ unsigned parse_number(std::string_view s, int base) {
         if (c >= '0' && c <= '9') d = c - '0';
         else if (base == 16 && c >= 'A' && c <= 'F') d = c - 'A' + 10;
         else if (base == 16 && c >= 'a' && c <= 'f') d = c - 'a' + 10;
-        if (d < 0) throw FormatError("MBD text: bad number '" + std::string(s) + "' in a tag");
+        if (d < 0) throw FormatError("MBD text: bad number '" + nx::string(s) + "' in a tag");
         v = v * static_cast<unsigned>(base) + static_cast<unsigned>(d);
         if (v > 0xFFFF) throw FormatError("MBD text: number out of range in a tag");
     }
@@ -116,7 +118,7 @@ nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<s
         std::memcpy(out.data() + at, &u, 4);
     };
     for (const auto& [index, message] : changes) {
-        if (index >= messages.size()) throw Error("MBD: message " + std::to_string(index) + " does not exist");
+        if (index >= messages.size()) throw Error("MBD: message " + nx::format("{}", index) + " does not exist");
         if (message.pages.empty()) throw Error("MBD: a message needs at least one page");
         const auto bytes = serialize({message});  // "MBD\0" + the message, contiguous
         const std::size_t length = bytes.size() - 4, start = starts[index], space = sizes[index];
@@ -128,8 +130,8 @@ nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<s
         }
         const std::size_t header = 4 + 8 * message.pages.size();
         if (header > space)
-            throw FormatError("MBD: message " + std::to_string(index) + " has too many pages for its original place (" +
-                              std::to_string(message.pages.size()) + ")");
+            throw FormatError("MBD: message " + nx::format("{}", index) + " has too many pages for its original place (" +
+                              nx::format("{}", message.pages.size()) + ")");
         std::fill(out.begin() + static_cast<std::ptrdiff_t>(start), out.begin() + static_cast<std::ptrdiff_t>(start + space),
                   std::byte{0});
         set32(start, message.pages.size());
@@ -149,10 +151,10 @@ nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<s
 Charset Charset::european() {
     Charset c;
     for (int i = 0; i < 26; ++i) {
-        c.glyphs[static_cast<std::size_t>(i)] = std::string(1, static_cast<char>('A' + i));
-        c.glyphs[static_cast<std::size_t>(26 + i)] = std::string(1, static_cast<char>('a' + i));
+        c.glyphs[static_cast<std::size_t>(i)] = nx::string(1, static_cast<char>('A' + i));
+        c.glyphs[static_cast<std::size_t>(26 + i)] = nx::string(1, static_cast<char>('a' + i));
     }
-    for (int i = 0; i < 10; ++i) c.glyphs[static_cast<std::size_t>(52 + i)] = std::string(1, static_cast<char>('0' + i));
+    for (int i = 0; i < 10; ++i) c.glyphs[static_cast<std::size_t>(52 + i)] = nx::string(1, static_cast<char>('0' + i));
     const std::pair<int, const char*> punctuation[] = {
         {62, "!"}, {63, "?"}, {64, " "}, {65, "\""}, {66, "'"}, {67, ","}, {68, "."}, {69, ":"},
         {71, "-"}, {72, "/"}, {73, "("}, {74, ")"}, {78, "%"}, {83, "#"}, {89, "*"},
@@ -161,8 +163,8 @@ Charset Charset::european() {
     return c;
 }
 
-std::string to_text(const Message& message, const Charset& charset) {
-    std::string out;
+nx::string to_text(const Message& message, const Charset& charset) {
+    nx::string out;
     for (std::size_t p = 0; p < message.pages.size(); ++p) {
         if (p) out += "{PAGE}";
         const auto& page = message.pages[p];
@@ -171,7 +173,7 @@ std::string to_text(const Message& message, const Charset& charset) {
             if (t.is_glyph() && t.arg < charset.glyphs.size() && !charset.glyphs[t.arg].empty()) {
                 out += charset.glyphs[t.arg];
             } else if (t.is_glyph()) {
-                out += "{G:" + std::to_string(t.arg) + "}";
+                out += "{G:" + nx::format("{}", t.arg) + "}";
             } else if (t.is_control() && t.control() == kNewline && t.arg == 0) {
                 out += '\n';
             } else if (t.is_control() && t.control() == kChoice) {
@@ -186,8 +188,8 @@ std::string to_text(const Message& message, const Charset& charset) {
     return out;
 }
 
-Message from_text(std::string_view text, const Charset& charset) {
-    nx::map<std::string, std::uint16_t, std::less<>> encode;
+Message from_text(nx::string_view text, const Charset& charset) {
+    nx::map<nx::string, std::uint16_t, std::less<>> encode;
     std::size_t longest = 1;
     for (std::size_t i = 0; i < charset.glyphs.size(); ++i)
         if (!charset.glyphs[i].empty()) {
@@ -206,11 +208,11 @@ Message from_text(std::string_view text, const Charset& charset) {
         }
         if (text[i] == '{') {
             const std::size_t close = text.find('}', i);
-            if (close == std::string_view::npos) throw FormatError("MBD text: unterminated tag");
-            const std::string_view tag = text.substr(i + 1, close - i - 1);
+            if (close == nx::string_view::npos) throw FormatError("MBD text: unterminated tag");
+            const nx::string_view tag = text.substr(i + 1, close - i - 1);
             const std::size_t colon = tag.find(':');
-            const std::string_view name = tag.substr(0, colon);
-            const std::string_view value = colon == std::string_view::npos ? std::string_view{} : tag.substr(colon + 1);
+            const nx::string_view name = tag.substr(0, colon);
+            const nx::string_view value = colon == nx::string_view::npos ? nx::string_view{} : tag.substr(colon + 1);
             if (tag == "PAGE") {
                 page.push_back(Token::make_control(kPageEnd));
                 m.pages.emplace_back();
@@ -224,11 +226,11 @@ Message from_text(std::string_view text, const Charset& charset) {
                                                    static_cast<std::uint16_t>(value.empty() ? 0 : parse_number(value, 16))));
             } else if (name == "T") {
                 const std::size_t second = value.find(':');
-                if (second == std::string_view::npos) throw FormatError("MBD text: bad {T:code:arg} tag");
+                if (second == nx::string_view::npos) throw FormatError("MBD text: bad {T:code:arg} tag");
                 page.push_back({static_cast<std::uint16_t>(parse_number(value.substr(0, second), 16)),
                                 static_cast<std::uint16_t>(parse_number(value.substr(second + 1), 16))});
             } else {
-                throw FormatError("MBD text: unknown tag {" + std::string(tag) + "}");
+                throw FormatError("MBD text: unknown tag {" + nx::string(tag) + "}");
             }
             i = close + 1;
             continue;
@@ -244,7 +246,7 @@ Message from_text(std::string_view text, const Charset& charset) {
         if (!matched) {
             std::size_t len = 1;  // report the whole UTF-8 character
             while (i + len < text.size() && (static_cast<unsigned char>(text[i + len]) & 0xC0) == 0x80) ++len;
-            throw FormatError("MBD text: the font has no glyph for '" + std::string(text.substr(i, len)) + "'");
+            throw FormatError("MBD text: the font has no glyph for '" + nx::string(text.substr(i, len)) + "'");
         }
     }
     m.pages.back().push_back(Token::make_control(kMessageEnd));

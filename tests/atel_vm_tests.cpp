@@ -1,6 +1,4 @@
 #include <cstring>
-#include <string>
-#include <string_view>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
@@ -9,13 +7,14 @@
 #include "test_main.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/strings/utf8_string.h"
 
 using namespace ff7cc;
 using namespace std::string_view_literals;
 
 namespace {
 
-nx::vector<std::byte> bytes(std::string_view text) {
+nx::vector<std::byte> bytes(nx::string_view text) {
     nx::vector<std::byte> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
@@ -62,7 +61,7 @@ TEST_CASE("atel vm: invalid or truncated bytecode is rejected") {
 }
 
 TEST_CASE("atel vm: mnemonics are unique and reversible") {
-    nx::set<std::string_view> seen;
+    nx::set<nx::string_view> seen;
     for (std::size_t op = 0; op < atel::kOpcodeCount; ++op) {
         const auto name = atel::opcode_info(static_cast<std::uint8_t>(op)).mnemonic;
         CHECK(!name.empty());
@@ -84,12 +83,12 @@ TEST_CASE("atel disasm labels methods, calls and jumps") {
         "\x2f"sv);                      // 0019 ret
     m.objects = {atel::Object{1, 0, 0, {{4, 0}}}};
     // Collapse column padding so the checks don't depend on alignment.
-    std::string text;
+    nx::string text;
     for (char c : atel::disassemble(m))
         if (c != ' ' || text.empty() || text.back() != ' ') text += c;
-    CHECK(text.find("Obj.main:\n 0000 call sub_000B\n") != std::string::npos);
-    CHECK(text.find("L_0005:\n 0005 halt\n") != std::string::npos);
-    CHECK(text.find(" 0006 jmp L_0005\n") != std::string::npos);
-    CHECK(text.find(R"(sub_000B:)" "\n" R"( 000B push.str "hi\"\x83L")") != std::string::npos);
-    CHECK(text.find(R"( 0010 calln "MapJump", pop=1)" "\n") != std::string::npos);
+    CHECK(text.find("Obj.main:\n 0000 call sub_000B\n") != nx::string::npos);
+    CHECK(text.find("L_0005:\n 0005 halt\n") != nx::string::npos);
+    CHECK(text.find(" 0006 jmp L_0005\n") != nx::string::npos);
+    CHECK(text.find(R"(sub_000B:)" "\n" R"( 000B push.str "hi\"\x83L")") != nx::string::npos);
+    CHECK(text.find(R"( 0010 calln "MapJump", pop=1)" "\n") != nx::string::npos);
 }

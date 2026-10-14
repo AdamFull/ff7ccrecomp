@@ -7,11 +7,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
-#include <filesystem>
 #include <functional>
 #include <mutex>
-#include <string>
-#include <string_view>
 #include <thread>
 
 #include "ff7cc/error.hpp"
@@ -20,10 +17,14 @@
 #include "ff7cc/formats/pkg.hpp"
 #include "ff7cc/formats/psmf.hpp"
 #include "ff7cc/io/file.hpp"
+#include "ff7cc/io/path.hpp"
+#include "ff7cc/text.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/platform/filesystem.h"
+#include "core/foundation/strings/format.h"
+#include "core/foundation/strings/utf8_string.h"
 
-namespace fs = std::filesystem;
 using namespace ff7cc;
 
 namespace {
@@ -47,19 +48,19 @@ void usage() {
 }
 
 struct Options {
-    std::string ffmpeg = "ffmpeg";
+    nx::string ffmpeg = "ffmpeg";
     unsigned jobs = std::max(1u, std::thread::hardware_concurrency() / 2);
-    std::string only;
+    nx::string only;
     std::size_t limit = static_cast<std::size_t>(-1);
     nx::vector<std::size_t> entries;
     bool force = false, keep_temp = false;
     int audio_quality = 6, video_crf = 26;
 };
 
-std::string quote(const fs::path& p) { return "\"" + p.string() + "\""; }
+nx::string quote(nx::fs::path_view p) { return nx::string("\"") + p.native() + "\""; }
 
 // Runs a command line through the shell; returns the exit status.
-int run(const std::string& command) {
+int run(const nx::string& command) {
 #ifdef _WIN32
     // cmd.exe strips the outer quotes of a command that starts with one; wrap the whole line once more.
     return std::system(("\"" + command + "\"").c_str());
@@ -68,34 +69,33 @@ int run(const std::string& command) {
 #endif
 }
 
-void write_file(const fs::path& path, std::span<const std::byte> data) {
+void write_file(nx::fs::path_view path, std::span<const std::byte> data) {
     io::File f(path, io::File::Mode::Write);
     f.write(data);
 }
 
 struct Task {
-    std::string label;
+    nx::string label;
     std::function<bool()> work;
 };
 
 class Cooker {
 public:
-    Cooker(const Options& options, fs::path out) : opt_(options), out_(std::move(out)), tmp_(out_ / "tmp") {
-        fs::create_directories(out_ / "audio");
-        fs::create_directories(out_ / "movies");
-        fs::create_directories(tmp_);
+    Cooker(const Options& options, nx::fs::path_view out)
+        : opt_(options), out_(out.native()), tmp_(path_join(out_, "tmp")) {
+        for (const nx::string& dir : {path_join(out_, "audio"), path_join(out_, "movies"), tmp_})
+            if (!nx::fs::create_directories(dir)) throw IoError("cannot create directory '" + dir + "'");
     }
 
-    std::string ffmpeg() const { return quote(opt_.ffmpeg) + " -hide_banner -loglevel error -nostdin -y"; }
+    nx::string ffmpeg() const { return quote(opt_.ffmpeg) + " -hide_banner -loglevel error -nostdin -y"; }
 
     // Writes `data` to a temporary input, runs FFmpeg with `args` between "-i input" and the output, and moves
     // the result into place. Retries a few times: freshly written files can be briefly locked on Windows
     // (e.g. by antivirus scanning).
-    bool transcode(const std::string& name, std::span<const std::byte> data, const std::string& input_args,
-                   const std::string& output_args, const fs::path& out) {
-        const fs::path in = tmp_ / name;
-        const fs::path part = fs::path(out).concat(".part");
-        std::error_code ec;
+    bool transcode(nx::string_view name, std::span<const std::byte> data, nx::string_view input_args,
+                   nx::string_view output_args, nx::fs::path_view out) {
+        const nx::string in = path_join(tmp_, name);
+        const nx::string part = nx::string(out.native()) + ".part";
         bool ok = false;
         for (int attempt = 0; attempt < 3 && !ok; ++attempt) {
             if (attempt) std::this_thread::sleep_for(std::chrono::milliseconds(500 * attempt));
@@ -106,27 +106,26 @@ public:
             }
             ok = run(ffmpeg() + " " + input_args + " -i " + quote(in) + " " + output_args + " " + quote(part)) == 0;
         }
-        if (!opt_.keep_temp) fs::remove(in, ec);
+        if (!opt_.keep_temp) (void)nx::fs::remove(in);
         if (!ok) {
-            fs::remove(part, ec);
+            (void)nx::fs::remove(part);
             return false;
         }
         for (int attempt = 0; attempt < 5; ++attempt) {
-            fs::rename(part, out, ec);
-            if (!ec) return true;
+            if (nx::fs::rename(part, out)) return true;
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
         return false;
     }
 
-    std::string vorbis_args() const {
+    nx::string vorbis_args() const {
         // Regenerate timestamps: FFmpeg's ATRAC3plus decoder repeats them, which corrupts Ogg granule positions.
-        return "-af asetpts=N/SR/TB -c:a libvorbis -q:a " + std::to_string(opt_.audio_quality) + " -f ogg";
+        return nx::format("-af asetpts=N/SR/TB -c:a libvorbis -q:a {} -f ogg", opt_.audio_quality);
     }
 
     // RIFF ATRAC -> Ogg Vorbis (the raw decoder timeline; the runtime applies delay and loops itself).
     bool cook_audio(std::size_t entry, const nx::vector<std::byte>& file, std::uint64_t key) {
-        return transcode("a" + std::to_string(entry) + ".at3", file, "", vorbis_args(), cooked::audio_path(out_, key));
+        return transcode(nx::format("a{}.at3", entry), file, "", vorbis_args(), cooked::audio_path(out_, key));
     }
 
     // PSMF -> AV1 video (one frame per access unit, in display order) + Ogg Vorbis audio.
@@ -156,16 +155,15 @@ public:
         demux.finish();
         drain();
 
-        const std::string stem = "m" + std::to_string(entry);
+        const nx::string stem = nx::format("m{}", entry);
         bool ok = true;
-        const fs::path video_out = cooked::movie_video_path(out_, key);
-        if (!video.empty() && (opt_.force || !fs::exists(video_out)))
+        const nx::string video_out = cooked::movie_video_path(out_, key);
+        if (!video.empty() && (opt_.force || !nx::fs::exists(video_out)))
             ok = transcode(stem + ".h264", video, "-framerate 30000/1001 -f h264",
-                           "-c:v libsvtav1 -preset 6 -crf " + std::to_string(opt_.video_crf) +
-                               " -g 300 -pix_fmt yuv420p -f ivf",
+                           nx::format("-c:v libsvtav1 -preset 6 -crf {} -g 300 -pix_fmt yuv420p -f ivf", opt_.video_crf),
                            video_out);
-        const fs::path audio_out = cooked::movie_audio_path(out_, key);
-        if (ok && !audio.empty() && demux.atrac_params() && (opt_.force || !fs::exists(audio_out)))
+        const nx::string audio_out = cooked::movie_audio_path(out_, key);
+        if (ok && !audio.empty() && demux.atrac_params() && (opt_.force || !nx::fs::exists(audio_out)))
             ok = transcode(stem + ".at3", atrac::make_atrac3plus_riff(audio, demux.atrac_params(), 2), "",
                            vorbis_args(), audio_out);
         return ok;
@@ -173,10 +171,11 @@ public:
 
 private:
     Options opt_;
-    fs::path out_, tmp_;
+    nx::string out_, tmp_;
 };
 
-int cook(const fs::path& game, const fs::path& out, const Options& opt) {
+int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) {
+    const nx::string_view out = out_dir.native();
 #ifdef _WIN32
     _putenv_s("SVT_LOG", "1");  // SVT-AV1: errors only
 #else
@@ -204,14 +203,14 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
                 ++duplicates;
                 continue;
             }
-            if (fs::exists(cooked::audio_path(out, key)) && !opt.force) {
+            if (nx::fs::exists(cooked::audio_path(out, key)) && !opt.force) {
                 ++skipped;
                 continue;
             }
             ++audio_count;
             ++embedded;
             nx::vector<std::byte> clip(it, it + static_cast<std::ptrdiff_t>(length));
-            tasks.push_back({"audio " + std::to_string(i) + "+" + std::to_string(at),
+            tasks.push_back({nx::format("audio {}+{}", i, at),
                              [&cooker, i, key, clip = std::move(clip)] { return cooker.cook_audio(i, clip, key); }});
         }
     };
@@ -243,15 +242,15 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
             continue;
         }
         seen.emplace(key, i);
-        const bool exists = is_audio ? fs::exists(cooked::audio_path(out, key))
-                                     : fs::exists(cooked::movie_video_path(out, key)) &&
-                                           fs::exists(cooked::movie_audio_path(out, key));
+        const bool exists = is_audio ? nx::fs::exists(cooked::audio_path(out, key))
+                                     : nx::fs::exists(cooked::movie_video_path(out, key)) &&
+                                           nx::fs::exists(cooked::movie_audio_path(out, key));
         if (exists && !opt.force) {
             ++skipped;
             continue;
         }
         (is_audio ? audio_count : movie_count)++;
-        tasks.push_back({(is_audio ? "audio " : "movie ") + std::to_string(i), [&reader, &cooker, i, key, is_audio] {
+        tasks.push_back({nx::format("{} {}", is_audio ? "audio" : "movie", i), [&reader, &cooker, i, key, is_audio] {
                              nx::vector<std::byte> file;
                              {
                                  static std::mutex m;  // one pkg file handle
@@ -288,8 +287,7 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
             }
         });
     for (auto& t : pool) t.join();
-    std::error_code ec;
-    if (!opt.keep_temp) fs::remove(out / "tmp", ec);
+    if (!opt.keep_temp) (void)nx::fs::remove(path_join(out, "tmp"));
     std::fprintf(stderr, "done: %zu cooked, %zu failed\n", tasks.size() - failed.load(), failed.load());
     return failed ? 1 : 0;
 }
@@ -304,21 +302,21 @@ int main(int argc, char** argv) {
     try {
         Options opt;
         for (int i = 3; i < argc; ++i) {
-            const std::string_view a = argv[i];
-            const auto next = [&]() -> std::string {
-                if (i + 1 >= argc) throw Error("missing value for " + std::string(a));
+            const nx::string_view a = argv[i];
+            const auto next = [&]() -> nx::string_view {
+                if (i + 1 >= argc) throw Error(nx::string("missing value for ") + a);
                 return argv[++i];
             };
             if (a == "--ffmpeg") opt.ffmpeg = next();
-            else if (a == "--jobs") opt.jobs = std::max(1u, static_cast<unsigned>(std::stoul(next())));
+            else if (a == "--jobs") opt.jobs = std::max(1u, static_cast<unsigned>(parse_u64(next())));
             else if (a == "--only") opt.only = next();
-            else if (a == "--limit") opt.limit = std::stoull(next());
-            else if (a == "--entry") opt.entries.push_back(std::stoull(next()));
+            else if (a == "--limit") opt.limit = parse_u64(next());
+            else if (a == "--entry") opt.entries.push_back(parse_u64(next()));
             else if (a == "--force") opt.force = true;
             else if (a == "--keep-temp") opt.keep_temp = true;
-            else if (a == "--audio-quality") opt.audio_quality = std::stoi(next());
-            else if (a == "--video-crf") opt.video_crf = std::stoi(next());
-            else throw Error("unknown option " + std::string(a));
+            else if (a == "--audio-quality") opt.audio_quality = static_cast<int>(parse_i64(next()));
+            else if (a == "--video-crf") opt.video_crf = static_cast<int>(parse_i64(next()));
+            else throw Error(nx::string("unknown option ") + a);
         }
         return cook(argv[1], argv[2], opt);
     } catch (const std::exception& e) {

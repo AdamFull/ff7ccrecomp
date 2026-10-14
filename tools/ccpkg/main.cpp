@@ -4,26 +4,25 @@
 #include <array>
 #include <cstdio>
 #include <exception>
-#include <filesystem>
-#include <fstream>
 #include <optional>
-#include <sstream>
-#include <string>
-#include <string_view>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "ff7cc/io/file.hpp"
+#include "ff7cc/io/path.hpp"
+#include "ff7cc/text.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/platform/filesystem.h"
+#include "core/foundation/strings/format.h"
+#include "core/foundation/strings/utf8_string.h"
 
-namespace fs = std::filesystem;
 using namespace ff7cc;
 
 namespace {
 
-constexpr std::string_view kManifestName = "manifest.tsv";
-constexpr std::string_view kManifestHeader = "# ff7cc-pkg-manifest 1";
+constexpr nx::string_view kManifestName = "manifest.tsv";
+constexpr nx::string_view kManifestHeader = "# ff7cc-pkg-manifest 1";
 
 void usage() {
     std::fputs(
@@ -46,33 +45,38 @@ struct Range {
     std::size_t last = 0;  // inclusive
 };
 
-Range parse_range(std::string_view text, std::size_t count) {
+Range parse_range(nx::string_view text, std::size_t count) {
     const auto dash = text.find('-');
     try {
-        const std::size_t a = std::stoul(std::string(text.substr(0, dash)));
-        const std::size_t b = dash == std::string_view::npos ? a : std::stoul(std::string(text.substr(dash + 1)));
+        const std::size_t a = parse_u64(text.substr(0, dash));
+        const std::size_t b = dash == nx::string_view::npos ? a : parse_u64(text.substr(dash + 1));
         if (a > b || b >= count) throw Error("");
         return Range{a, b};
     } catch (const std::exception&) {
-        throw Error("invalid --range '" + std::string(text) + "' (archive has " + std::to_string(count) + " files)");
+        throw Error(nx::string("invalid --range '") + text + "' (archive has " + nx::format("{}", count) + " files)");
     }
 }
 
-std::string file_name(std::size_t index, pkg::FileType type) {
+nx::string file_name(std::size_t index, pkg::FileType type) {
     char buf[16];
     std::snprintf(buf, sizeof buf, "%05zu", index);
-    return std::string(buf) + std::string(pkg::type_extension(type));
+    return nx::string(buf) + pkg::type_extension(type);
 }
 
-std::string human_size(std::uint64_t bytes) {
+nx::string human_size(std::uint64_t bytes) {
     char buf[32];
     std::snprintf(buf, sizeof buf, "%.1f MiB", static_cast<double>(bytes) / (1024.0 * 1024.0));
     return buf;
 }
 
+void make_directories(nx::fs::path_view dir) {
+    if (!nx::fs::create_directories(dir))
+        throw IoError(nx::string("cannot create directory '") + dir.native() + "'");
+}
+
 // ---------------------------------------------------------------------------------------------
 
-int cmd_info(const fs::path& game) {
+int cmd_info(nx::fs::path_view game) {
     const auto paths = pkg::locate(game);
     pkg::Reader reader(paths);
 
@@ -87,104 +91,108 @@ int cmd_info(const fs::path& game) {
         s.bytes += reader.entry(i).size;
     }
 
-    std::printf("index:   %s\narchive: %s (%s)\nfiles:   %zu\n\n", paths.fse.string().c_str(),
-                paths.pkg.string().c_str(), human_size(reader.archive_size()).c_str(), reader.size());
+    std::printf("index:   %s\narchive: %s (%s)\nfiles:   %zu\n\n", paths.fse.c_str(), paths.pkg.c_str(),
+                human_size(reader.archive_size()).c_str(), reader.size());
     std::printf("%-8s %7s %12s\n", "type", "count", "size");
     for (const auto& [type, s] : stats)
-        std::printf("%-8s %7zu %12s\n", std::string(pkg::type_name(type)).c_str(), s.count,
+        std::printf("%-8s %7zu %12s\n", nx::string(pkg::type_name(type)).c_str(), s.count,
                     human_size(s.bytes).c_str());
     return 0;
 }
 
-int cmd_list(const fs::path& game) {
+int cmd_list(nx::fs::path_view game) {
     pkg::Reader reader(pkg::locate(game));
     std::puts("index\tsector\tsize\ttype");
     for (std::size_t i = 0; i < reader.size(); ++i) {
         const auto& e = reader.entry(i);
-        std::printf("%zu\t%u\t%u\t%s\n", i, e.sector, e.size, std::string(pkg::type_name(reader.sniff(i))).c_str());
+        std::printf("%zu\t%u\t%u\t%s\n", i, e.sector, e.size, nx::string(pkg::type_name(reader.sniff(i))).c_str());
     }
     return 0;
 }
 
-int cmd_extract(const fs::path& game, const fs::path& out, std::optional<std::string_view> range_text) {
+int cmd_extract(nx::fs::path_view game, nx::fs::path_view out, std::optional<nx::string_view> range_text) {
     pkg::Reader reader(pkg::locate(game));
     const Range range = range_text ? parse_range(*range_text, reader.size()) : Range{0, reader.size() - 1};
 
-    const fs::path files_dir = out / "files";
-    fs::create_directories(files_dir);
+    make_directories(path_join(out.native(), "files"));
 
-    std::ofstream manifest(out / kManifestName, std::ios::binary);
-    if (!manifest) throw IoError("cannot write manifest in '" + out.string() + "'");
-    manifest << kManifestHeader << "\n# index\ttype\tsize\tpath\n";
+    nx::string manifest(kManifestHeader);
+    manifest += "\n# index\ttype\tsize\tpath\n";
 
     std::uint64_t total = 0;
     for (std::size_t i = range.first; i <= range.last; ++i) {
         const auto& e = reader.entry(i);
         const auto type = reader.sniff(i);
-        std::string rel = "-";
+        nx::string rel = "-";
         if (e.size > 0) {
             rel = "files/" + file_name(i, type);
-            io::File f(out / rel, io::File::Mode::Write);
+            io::File f(path_join(out.native(), rel), io::File::Mode::Write);
             reader.copy_to(i, f);
             f.close();
             total += e.size;
         }
-        manifest << i << '\t' << pkg::type_name(type) << '\t' << e.size << '\t' << rel << '\n';
+        manifest += nx::format("{}\t{}\t{}\t{}\n", i, pkg::type_name(type), e.size, rel);
         if ((i - range.first + 1) % 1000 == 0)
             std::fprintf(stderr, "  %zu / %zu files\n", i - range.first + 1, range.last - range.first + 1);
     }
-    if (!manifest.flush()) throw IoError("error writing manifest");
+    if (!nx::fs::file_write_text(path_join(out.native(), kManifestName), manifest))
+        throw IoError(nx::string("cannot write manifest in '") + out.native() + "'");
     std::printf("extracted %zu entries (%s) to %s\n", range.last - range.first + 1, human_size(total).c_str(),
-                out.string().c_str());
+                nx::string(out.native()).c_str());
     return 0;
 }
 
-int cmd_pack(const fs::path& extracted, const fs::path& out) {
-    std::ifstream manifest(extracted / kManifestName, std::ios::binary);
-    if (!manifest) throw IoError("no " + std::string(kManifestName) + " in '" + extracted.string() + "'");
+int cmd_pack(nx::fs::path_view extracted, nx::fs::path_view out) {
+    const auto manifest = nx::fs::file_read_text(path_join(extracted.native(), kManifestName));
+    if (!manifest) throw IoError(nx::string("no ") + kManifestName + " in '" + extracted.native() + "'");
 
     struct Row {
         std::size_t index;
-        std::string path;
+        nx::string path;
     };
     nx::vector<Row> rows;
-    std::string line;
+    const nx::string_view text = manifest.value();
     std::size_t line_no = 0;
     bool header_seen = false;
-    while (std::getline(manifest, line)) {
+    for (std::size_t pos = 0; pos < text.size();) {
+        const std::size_t nl = text.find('\n', pos);
+        const std::size_t end = nl == nx::string_view::npos ? text.size() : nl;
+        nx::string_view line = text.substr(pos, end - pos);
+        pos = end + 1;
         ++line_no;
-        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.ends_with('\r')) line.remove_suffix(1);
         if (line == kManifestHeader) header_seen = true;
         if (line.empty() || line.front() == '#') continue;
-        std::istringstream fields(line);
-        std::string index, type, size, path;
-        if (!std::getline(fields, index, '\t') || !std::getline(fields, type, '\t') ||
-            !std::getline(fields, size, '\t') || !std::getline(fields, path))
-            throw FormatError("manifest line " + std::to_string(line_no) + ": expected 4 tab-separated fields");
-        rows.push_back(Row{std::stoul(index), path});
+        // index \t type \t size \t path (the path is the rest of the line and must not be empty)
+        const std::size_t t1 = line.find('\t');
+        const std::size_t t2 = t1 == nx::string_view::npos ? t1 : line.find('\t', t1 + 1);
+        const std::size_t t3 = t2 == nx::string_view::npos ? t2 : line.find('\t', t2 + 1);
+        if (t3 == nx::string_view::npos || t3 + 1 == line.size())
+            throw FormatError("manifest line " + nx::format("{}", line_no) + ": expected 4 tab-separated fields");
+        rows.push_back(Row{parse_u64(line.substr(0, t1)), nx::string(line.substr(t3 + 1))});
     }
-    if (!header_seen) throw FormatError("manifest is missing the '" + std::string(kManifestHeader) + "' header");
+    if (!header_seen) throw FormatError(nx::string("manifest is missing the '") + kManifestHeader + "' header");
 
     std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.index < b.index; });
     for (std::size_t i = 0; i < rows.size(); ++i)
         if (rows[i].index != i)
             throw FormatError("manifest must list every index from 0 with no gaps (missing or duplicate " +
-                              std::to_string(i) + "); extract the full archive before packing");
+                              nx::format("{}", i) + "); extract the full archive before packing");
 
-    fs::create_directories(out);
+    make_directories(out);
     pkg::Writer writer(pkg::output_paths(out));
     for (const auto& row : rows) {
         if (row.path == "-")
             writer.add({});
         else
-            writer.add_file(extracted / row.path);
+            writer.add_file(path_join(extracted.native(), row.path));
     }
     writer.finish();
-    std::printf("packed %zu files into %s\n", writer.size(), out.string().c_str());
+    std::printf("packed %zu files into %s\n", writer.size(), nx::string(out.native()).c_str());
     return 0;
 }
 
-int cmd_verify(const fs::path& a_dir, const fs::path& b_dir) {
+int cmd_verify(nx::fs::path_view a_dir, nx::fs::path_view b_dir) {
     pkg::Reader a(pkg::locate(a_dir));
     pkg::Reader b(pkg::locate(b_dir));
     if (a.size() != b.size()) {
@@ -218,20 +226,19 @@ int cmd_verify(const fs::path& a_dir, const fs::path& b_dir) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    const nx::vector<std::string_view> args(argv + 1, argv + argc);
+    const nx::vector<nx::string_view> args(argv + 1, argv + argc);
     if (args.empty() || args[0] == "-h" || args[0] == "--help") {
         usage();
         return args.empty() ? 2 : 0;
     }
     try {
         const auto cmd = args[0];
-        if (cmd == "info" && args.size() == 2) return cmd_info(fs::path(args[1]));
-        if (cmd == "list" && args.size() == 2) return cmd_list(fs::path(args[1]));
+        if (cmd == "info" && args.size() == 2) return cmd_info(args[1]);
+        if (cmd == "list" && args.size() == 2) return cmd_list(args[1]);
         if (cmd == "extract" && (args.size() == 3 || (args.size() == 5 && args[3] == "--range")))
-            return cmd_extract(fs::path(args[1]), fs::path(args[2]),
-                               args.size() == 5 ? std::optional(args[4]) : std::nullopt);
-        if (cmd == "pack" && args.size() == 3) return cmd_pack(fs::path(args[1]), fs::path(args[2]));
-        if (cmd == "verify" && args.size() == 3) return cmd_verify(fs::path(args[1]), fs::path(args[2]));
+            return cmd_extract(args[1], args[2], args.size() == 5 ? std::optional(args[4]) : std::nullopt);
+        if (cmd == "pack" && args.size() == 3) return cmd_pack(args[1], args[2]);
+        if (cmd == "verify" && args.size() == 3) return cmd_verify(args[1], args[2]);
         usage();
         return 2;
     } catch (const std::exception& e) {

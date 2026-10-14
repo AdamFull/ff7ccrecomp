@@ -22,11 +22,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
-#include <string>
-#include <string_view>
 
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/strings/utf8_string.h"
 
 namespace ff7cc::mbd {
 
@@ -64,14 +63,14 @@ nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<s
 
 // Glyph index -> UTF-8 text. Unnamed glyphs are written as {G:n}.
 struct Charset {
-    std::array<std::string, 256> glyphs;
+    std::array<nx::string, 256> glyphs;
 
     // The font of the European English release (glyphs confirmed from the text; a few rare ones stay unnamed).
     static Charset european();
 };
 
-std::string to_text(const Message& message, const Charset& charset);
+nx::string to_text(const Message& message, const Charset& charset);
 // Throws FormatError on characters the charset cannot encode or malformed tags.
-Message from_text(std::string_view text, const Charset& charset);
+Message from_text(nx::string_view text, const Charset& charset);
 
 }  // namespace ff7cc::mbd

@@ -2,12 +2,13 @@
 
 #include <algorithm>
 #include <cstring>
-#include <string>
 #include <type_traits>
 
 #include "ff7cc/error.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
+#include "core/foundation/strings/utf8_string.h"
+#include "core/foundation/strings/format.h"
 
 namespace ff7cc::atel {
 
@@ -44,7 +45,7 @@ public:
 private:
     void require(std::size_t at, std::size_t count) const {
         if (at > data_.size() || count > data_.size() - at)
-            throw FormatError("Atel module truncated at offset " + std::to_string(at));
+            throw FormatError("Atel module truncated at offset " + nx::format("{}", at));
     }
 
     std::span<const std::byte> data_;
@@ -74,17 +75,17 @@ private:
 std::size_t align_up(std::size_t v, std::size_t a) { return (v + a - 1) / a * a; }
 
 std::uint32_t checked_u32(std::size_t v, const char* what) {
-    if (v > 0xFFFFFFFFu) throw FormatError(std::string(what) + " exceeds 4 GiB");
+    if (v > 0xFFFFFFFFu) throw FormatError(nx::string(what) + " exceeds 4 GiB");
     return static_cast<std::uint32_t>(v);
 }
 
 }  // namespace
 
-std::string_view Module::name_at(std::uint32_t offset) const {
-    if (offset >= names.size()) throw FormatError("name offset " + std::to_string(offset) + " out of range");
+nx::string_view Module::name_at(std::uint32_t offset) const {
+    if (offset >= names.size()) throw FormatError("name offset " + nx::format("{}", offset) + " out of range");
     const auto* begin = reinterpret_cast<const char*>(names.data()) + offset;
     const auto* end = reinterpret_cast<const char*>(names.data()) + names.size();
-    return std::string_view(begin, static_cast<std::size_t>(std::find(begin, end, '\0') - begin));
+    return nx::string_view(begin, static_cast<std::size_t>(std::find(begin, end, '\0') - begin));
 }
 
 bool is_atel(std::span<const std::byte> data) {
@@ -110,8 +111,8 @@ Module parse(std::span<const std::byte> data) {
     m.reserved = in.read<std::uint8_t>();
     m.flags = in.read<std::uint8_t>();
     if (m.version_major != 1 || m.version_minor != 3)
-        throw FormatError("unsupported Atel version " + std::to_string(m.version_major) + "." +
-                          std::to_string(m.version_minor));
+        throw FormatError("unsupported Atel version " + nx::format("{}", m.version_major) + "." +
+                          nx::format("{}", m.version_minor));
     const auto object_count = in.read<std::uint32_t>();
     const auto names_size = in.read<std::uint32_t>();
     const auto code_size = in.read<std::uint32_t>();
@@ -157,7 +158,7 @@ Module parse(std::span<const std::byte> data) {
         const std::size_t end = begin + spans[i].size;
         const std::size_t next = i + 1 < resource_count ? base + spans[i + 1].offset : data.size();
         if (spans[i].offset % kResourceAlignment != 0 || end > next || next > data.size())
-            throw FormatError("Atel resource " + std::to_string(i) + " has an invalid offset or size");
+            throw FormatError("Atel resource " + nx::format("{}", i) + " has an invalid offset or size");
         in.seek(begin);
         m.resources[i].data = in.bytes(spans[i].size);
         m.resources[i].slack = in.bytes(next - end);
@@ -230,9 +231,9 @@ nx::vector<std::byte> serialize(const Module& m) {
     return out.take();
 }
 
-std::string_view resource_type(std::span<const std::byte> data) {
+nx::string_view resource_type(std::span<const std::byte> data) {
     struct Tag {
-        std::string_view magic, type;
+        nx::string_view magic, type;
     };
     static constexpr Tag kTags[] = {{"MBD\0", "mbd"}, {"SSCF", "sscf"}, {"RIFF", "at3"}, {"LEAF", "leaf"}};
     for (const auto& tag : kTags)
@@ -260,7 +261,7 @@ nx::vector<std::byte> replace_resources(std::span<const std::byte> module,
         std::memcpy(out.data() + at, &u, 4);
     };
     for (const auto& [index, data] : replacements) {
-        if (index >= count) throw Error("resource " + std::to_string(index) + " does not exist");
+        if (index >= count) throw Error("resource " + nx::format("{}", index) + " does not exist");
         const std::size_t entry = table + 8 + 8 * index;
         const std::size_t offset = read32(entry);
         const std::size_t space = (index + 1 < count ? read32(entry + 8) : module.size() - base) - offset;

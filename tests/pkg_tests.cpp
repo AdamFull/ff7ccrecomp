@@ -1,19 +1,19 @@
 #include <cstring>
-#include <filesystem>
+#include <cstdlib>
 #include <random>
-#include <string>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "test_main.hpp"
 #include "core/foundation/core/foundation.h"
+#include "core/foundation/strings/utf8_string.h"
+#include "core/foundation/strings/format.h"
 
-namespace fs = std::filesystem;
 using namespace ff7cc;
 
 namespace {
 
-nx::vector<std::byte> bytes(std::string_view text) {
+nx::vector<std::byte> bytes(nx::string_view text) {
     nx::vector<std::byte> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
@@ -28,16 +28,15 @@ nx::vector<std::byte> random_bytes(std::size_t n, unsigned seed) {
 
 // Creates a unique scratch directory and removes it when the test ends.
 struct TempDir {
-    fs::path path;
+    nx::string path;
     TempDir() {
         std::random_device rd;
-        path = fs::temp_directory_path() / ("ff7cc_test_" + std::to_string(rd()));
-        fs::create_directories(path);
+        const char* tmp = std::getenv("TEMP");
+        if (!tmp) tmp = std::getenv("TMPDIR");
+        path = path_join(tmp ? tmp : ".", "ff7cc_test_" + nx::format("{}", rd()));
+        (void)nx::fs::create_directories(path);
     }
-    ~TempDir() {
-        std::error_code ec;
-        fs::remove_all(path, ec);
-    }
+    ~TempDir() { (void)nx::fs::remove_all(path); }
 };
 
 }  // namespace
@@ -77,8 +76,8 @@ TEST_CASE("sniff recognises known magics") {
 
 TEST_CASE("writer output reads back identically") {
     TempDir dir;
-    const fs::path game = dir.path / "PSP_GAME" / "USRDIR";
-    fs::create_directories(game);
+    const nx::string game = path_join(dir.path, "PSP_GAME", "USRDIR");
+    (void)nx::fs::create_directories(game);
 
     const nx::vector<nx::vector<std::byte>> files{
         bytes("Atel header"), random_bytes(pkg::kSectorSize, 1), {}, random_bytes(5000, 2), {}, bytes("x"),

@@ -1,10 +1,11 @@
 #include "ff7cc/formats/atel_vm.hpp"
 
 #include <bit>
-#include <string>
 
 #include "ff7cc/error.hpp"
 #include "core/foundation/core/foundation.h"
+#include "core/foundation/strings/utf8_string.h"
+#include "core/foundation/strings/format.h"
 
 namespace ff7cc::atel {
 
@@ -130,7 +131,7 @@ std::uint32_t operand_bytes(OperandKind kind) {
 }
 
 std::uint8_t byte_at(std::span<const std::byte> code, std::size_t at) {
-    if (at >= code.size()) throw FormatError("bytecode truncated at offset " + std::to_string(at));
+    if (at >= code.size()) throw FormatError("bytecode truncated at offset " + nx::format("{}", at));
     return std::to_integer<std::uint8_t>(code[at]);
 }
 
@@ -155,11 +156,11 @@ void put_be32(nx::vector<std::byte>& out, std::uint32_t v) {
 }  // namespace
 
 const OpcodeInfo& opcode_info(std::uint8_t opcode) {
-    if (opcode >= kOpcodeCount) throw FormatError("invalid script opcode " + std::to_string(opcode));
+    if (opcode >= kOpcodeCount) throw FormatError("invalid script opcode " + nx::format("{}", opcode));
     return kOpcodes[opcode];
 }
 
-std::optional<std::uint8_t> opcode_from_mnemonic(std::string_view mnemonic) {
+std::optional<std::uint8_t> opcode_from_mnemonic(nx::string_view mnemonic) {
     for (std::size_t i = 0; i < kOpcodes.size(); ++i)
         if (kOpcodes[i].mnemonic == mnemonic) return static_cast<std::uint8_t>(i);
     return std::nullopt;
@@ -170,7 +171,7 @@ std::uint32_t instruction_length(std::span<const std::byte> code, std::size_t of
     const auto& info = opcode_info(op);
     std::uint32_t length = 1 + operand_bytes(info.operand);
     if (info.operand == K::NativeCall) length += 2u * byte_at(code, offset + 6);
-    if (offset + length > code.size()) throw FormatError("bytecode truncated at offset " + std::to_string(offset));
+    if (offset + length > code.size()) throw FormatError("bytecode truncated at offset " + nx::format("{}", offset));
     return length;
 }
 

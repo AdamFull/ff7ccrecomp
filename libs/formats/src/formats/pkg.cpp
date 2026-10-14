@@ -5,10 +5,11 @@
 #include <bit>
 #include <cstring>
 #include <limits>
-#include <string>
 
 #include "ff7cc/error.hpp"
 #include "core/foundation/core/foundation.h"
+#include "core/foundation/strings/utf8_string.h"
+#include "core/foundation/strings/format.h"
 
 static_assert(std::endian::native == std::endian::little, "big-endian hosts are not supported");
 
@@ -24,14 +25,14 @@ std::uint32_t load_u32(const std::byte* p) {
 
 void store_u32(std::byte* p, std::uint32_t v) { std::memcpy(p, &v, sizeof v); }
 
-bool has_magic(std::span<const std::byte> head, std::string_view magic) {
+bool has_magic(std::span<const std::byte> head, nx::string_view magic) {
     return head.size() >= magic.size() && std::memcmp(head.data(), magic.data(), magic.size()) == 0;
 }
 
 struct TypeInfo {
     FileType type;
-    std::string_view name;
-    std::string_view extension;
+    nx::string_view name;
+    nx::string_view extension;
 };
 
 constexpr std::array kTypes{
@@ -53,7 +54,7 @@ const TypeInfo& info(FileType type) {
 
 nx::vector<Entry> parse_index(std::span<const std::byte> fse) {
     if (fse.size() % kEntrySize != 0)
-        throw FormatError("discimg.fse size " + std::to_string(fse.size()) + " is not a multiple of 12");
+        throw FormatError("discimg.fse size " + nx::format("{}", fse.size()) + " is not a multiple of 12");
     nx::vector<Entry> entries(fse.size() / kEntrySize);
     for (std::size_t i = 0; i < entries.size(); ++i) {
         const std::byte* p = fse.data() + i * kEntrySize;
@@ -78,9 +79,9 @@ void validate_index(std::span<const Entry> entries, std::uint64_t archive_size) 
     for (std::size_t i = 0; i < entries.size(); ++i) {
         const Entry& e = entries[i];
         if (e.offset() < min_offset)
-            throw FormatError("entry " + std::to_string(i) + " overlaps the previous file");
+            throw FormatError("entry " + nx::format("{}", i) + " overlaps the previous file");
         if (e.end() > archive_size)
-            throw FormatError("entry " + std::to_string(i) + " runs past the end of the archive");
+            throw FormatError("entry " + nx::format("{}", i) + " runs past the end of the archive");
         min_offset = e.end();
     }
 }
@@ -94,27 +95,26 @@ FileType sniff(std::span<const std::byte> head) {
     return FileType::Unknown;
 }
 
-std::string_view type_name(FileType type) { return info(type).name; }
-std::string_view type_extension(FileType type) { return info(type).extension; }
+nx::string_view type_name(FileType type) { return info(type).name; }
+nx::string_view type_extension(FileType type) { return info(type).extension; }
 
-FileType type_from_name(std::string_view name) {
+FileType type_from_name(nx::string_view name) {
     for (const auto& t : kTypes)
         if (t.name == name) return t.type;
     return FileType::Unknown;
 }
 
-ArchivePaths locate(const std::filesystem::path& dir) {
-    for (const auto& sub : {std::filesystem::path{}, std::filesystem::path{"USRDIR"},
-                            std::filesystem::path{"PSP_GAME"} / "USRDIR"}) {
-        const auto base = dir / sub;
-        ArchivePaths paths{base / "discimg.fse", base / "discimg.pkg"};
-        if (std::filesystem::is_regular_file(paths.fse) && std::filesystem::is_regular_file(paths.pkg)) return paths;
+ArchivePaths locate(nx::fs::path_view dir) {
+    for (const nx::string_view sub : {"", "USRDIR", "PSP_GAME/USRDIR"}) {
+        const nx::string base = path_join(dir.native(), sub);
+        ArchivePaths paths{path_join(base, "discimg.fse"), path_join(base, "discimg.pkg")};
+        if (is_file(paths.fse) && is_file(paths.pkg)) return paths;
     }
-    throw IoError("discimg.fse/discimg.pkg not found under '" + dir.string() + "'");
+    throw IoError(nx::string("discimg.fse/discimg.pkg not found under '") + dir.native() + "'");
 }
 
-ArchivePaths output_paths(const std::filesystem::path& dir) {
-    return ArchivePaths{dir / "discimg.fse", dir / "discimg.pkg"};
+ArchivePaths output_paths(nx::fs::path_view dir) {
+    return ArchivePaths{path_join(dir.native(), "discimg.fse"), path_join(dir.native(), "discimg.pkg")};
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -127,8 +127,8 @@ Reader::Reader(const ArchivePaths& paths)
 
 const Entry& Reader::entry(std::size_t index) const {
     if (index >= entries_.size())
-        throw Error("file index " + std::to_string(index) + " out of range (archive has " +
-                    std::to_string(entries_.size()) + ")");
+        throw Error("file index " + nx::format("{}", index) + " out of range (archive has " +
+                    nx::format("{}", entries_.size()) + ")");
     return entries_[index];
 }
 
@@ -149,7 +149,7 @@ std::size_t Reader::read_head(std::size_t index, std::span<std::byte> out) {
 void Reader::read_at(std::size_t index, std::uint64_t offset, std::span<std::byte> out) {
     const Entry& e = entry(index);
     if (offset > e.size || out.size() > e.size - offset)
-        throw Error("read past the end of file " + std::to_string(index));
+        throw Error("read past the end of file " + nx::format("{}", index));
     pkg_.read_exact_at(e.offset() + offset, out);
 }
 
@@ -170,7 +170,7 @@ Writer::Writer(const ArchivePaths& paths) : paths_(paths), pkg_(paths.pkg, io::F
 
 Entry Writer::begin_entry(std::uint64_t size) {
     if (size > std::numeric_limits<std::uint32_t>::max())
-        throw FormatError("file " + std::to_string(entries_.size()) + " is larger than 4 GiB");
+        throw FormatError("file " + nx::format("{}", entries_.size()) + " is larger than 4 GiB");
     return Entry{next_sector_, static_cast<std::uint32_t>(size), 0};
 }
 
@@ -195,7 +195,7 @@ void Writer::add_from(io::File& src, std::uint64_t offset, std::uint64_t size) {
     end_entry(e);
 }
 
-void Writer::add_file(const std::filesystem::path& path) {
+void Writer::add_file(nx::fs::path_view path) {
     io::File src(path, io::File::Mode::Read);
     add_from(src, 0, src.size());
 }

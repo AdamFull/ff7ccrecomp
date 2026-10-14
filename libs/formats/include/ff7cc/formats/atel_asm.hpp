@@ -1,8 +1,8 @@
 #pragma once
 
-#include <string_view>
 
 #include "ff7cc/formats/atel.hpp"
+#include "core/foundation/strings/utf8_string.h"
 
 namespace ff7cc::atel {
 
@@ -16,6 +16,6 @@ namespace ff7cc::atel {
 //   - Every method entry point is re-derived from its "Object.method" label, so code may grow or shrink.
 //
 // Throws FormatError (with the line number) on any syntax or resolution error; `module` is left unchanged then.
-void assemble_into(Module& module, std::string_view listing);
+void assemble_into(Module& module, nx::string_view listing);
 
 }  // namespace ff7cc::atel
