@@ -6,12 +6,12 @@
 #include <cstdint>
 #include <charconv>
 #include <cstdlib>
-#include <map>
 #include <string>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel_vm.hpp"
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace ff7cc::atel {
 
@@ -19,7 +19,7 @@ namespace {
 
 struct Line {
     std::size_t number;
-    std::vector<std::string> tokens;  // string literals keep their quotes; brackets are whole tokens
+    nx::vector<std::string> tokens;  // string literals keep their quotes; brackets are whole tokens
 };
 
 [[noreturn]] void fail(std::size_t line, const std::string& what) {
@@ -27,8 +27,8 @@ struct Line {
 }
 
 // Splits on whitespace and commas, keeping "..." literals (with escapes) and [...] lists intact.
-std::vector<std::string> tokenize(std::string_view text, std::size_t line) {
-    std::vector<std::string> out;
+nx::vector<std::string> tokenize(std::string_view text, std::size_t line) {
+    nx::vector<std::string> out;
     std::size_t i = 0;
     while (i < text.size()) {
         const char c = text[i];
@@ -128,7 +128,7 @@ bool is_hex_column(std::string_view tok) {
 
 class Pool {
 public:
-    explicit Pool(std::vector<std::byte>& names) : names_(names) {
+    explicit Pool(nx::vector<std::byte>& names) : names_(names) {
         for (std::size_t off = 0; off < names_.size();) {
             const auto* p = reinterpret_cast<const char*>(names_.data()) + off;
             const auto len = std::find(p, p + (names_.size() - off), '\0') - p;
@@ -147,15 +147,15 @@ public:
     }
 
 private:
-    std::vector<std::byte>& names_;
-    std::map<std::string, std::uint32_t> first_;
+    nx::vector<std::byte>& names_;
+    nx::map<std::string, std::uint32_t> first_;
 };
 
 }  // namespace
 
 void assemble_into(Module& module, std::string_view listing) {
     // Parse lines.
-    std::vector<Line> lines;
+    nx::vector<Line> lines;
     std::size_t number = 0;
     for (std::size_t pos = 0; pos <= listing.size();) {
         const auto nl = listing.find('\n', pos);
@@ -175,8 +175,8 @@ void assemble_into(Module& module, std::string_view listing) {
         std::string target;  // label for Code operands
         std::size_t line;
     };
-    std::vector<Pending> program;
-    std::map<std::string, std::uint32_t> labels;
+    nx::vector<Pending> program;
+    nx::map<std::string, std::uint32_t> labels;
     std::uint32_t offset = 0;
 
     for (const auto& [line, tok] : lines) {
@@ -189,7 +189,7 @@ void assemble_into(Module& module, std::string_view listing) {
         if (tok.size() >= 2 && is_hex_column(tok[0]) && opcode_from_mnemonic(tok[1])) t = 1;  // skip offset column
         const auto op = opcode_from_mnemonic(tok[t]);
         if (!op) fail(line, "unknown mnemonic '" + tok[t] + "'");
-        const auto args = std::vector<std::string>(tok.begin() + static_cast<std::ptrdiff_t>(t) + 1, tok.end());
+        const auto args = nx::vector<std::string>(tok.begin() + static_cast<std::ptrdiff_t>(t) + 1, tok.end());
 
         Pending p{Instruction{}, {}, line};
         p.insn.opcode = *op;
@@ -226,7 +226,7 @@ void assemble_into(Module& module, std::string_view listing) {
                 break;
             }
         }
-        std::vector<std::byte> scratch;
+        nx::vector<std::byte> scratch;
         encode(p.insn, scratch);
         p.insn.offset = offset;
         offset += static_cast<std::uint32_t>(scratch.size());
@@ -234,7 +234,7 @@ void assemble_into(Module& module, std::string_view listing) {
     }
 
     // Pass 2: resolve jump/call targets and encode.
-    std::vector<std::byte> code;
+    nx::vector<std::byte> code;
     for (auto& p : program) {
         if (!p.target.empty()) {
             const auto it = labels.find(p.target);

@@ -2,7 +2,6 @@
 #include <cstring>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
@@ -10,14 +9,15 @@
 #include "ff7cc/formats/atel_disasm.hpp"
 #include "ff7cc/formats/atel_vm.hpp"
 #include "test_main.hpp"
+#include "core/foundation/core/foundation.h"
 
 using namespace ff7cc;
 using namespace std::string_view_literals;
 
 namespace {
 
-std::vector<std::byte> bytes(std::string_view text) {
-    std::vector<std::byte> out(text.size());
+nx::vector<std::byte> bytes(std::string_view text) {
+    nx::vector<std::byte> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
 }
@@ -55,7 +55,7 @@ TEST_CASE("atel asm: assembles labels, literals and native calls") {
     CHECK(m.name_at(static_cast<std::uint32_t>(insns[4].imm)) == "new\x83L");
     CHECK(insns[4].imm == 17);  // appended after the original 17-byte pool
     CHECK(insns[5].call.name == 9 && insns[5].call.has_result == 1 && insns[5].call.pop_slots == 2);
-    CHECK(insns[5].call.types == std::vector<std::uint16_t>({1, 0}));
+    CHECK(insns[5].call.types == nx::vector<std::uint16_t>({1, 0}));
     CHECK(insns[6].imm == static_cast<std::int32_t>(insns[6].offset));  // jnz to itself
     CHECK(insns[7].opcode == 0x01);
     CHECK(m.objects[0].methods[0].code_offset == 0);

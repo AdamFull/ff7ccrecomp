@@ -15,9 +15,9 @@
 #include <filesystem>
 #include <span>
 #include <string_view>
-#include <vector>
 
 #include "ff7cc/io/file.hpp"
+#include "core/foundation/core/foundation.h"
 
 namespace ff7cc::pkg {
 
@@ -36,8 +36,8 @@ struct Entry {
     friend bool operator==(const Entry&, const Entry&) = default;
 };
 
-std::vector<Entry> parse_index(std::span<const std::byte> fse);
-std::vector<std::byte> serialize_index(std::span<const Entry> entries);
+nx::vector<Entry> parse_index(std::span<const std::byte> fse);
+nx::vector<std::byte> serialize_index(std::span<const Entry> entries);
 
 // Throws FormatError if entries are out of order, overlap, or run past archive_size.
 void validate_index(std::span<const Entry> entries, std::uint64_t archive_size);
@@ -70,7 +70,7 @@ public:
     const Entry& entry(std::size_t index) const;
     std::uint64_t archive_size() const { return archive_size_; }
 
-    std::vector<std::byte> read(std::size_t index);
+    nx::vector<std::byte> read(std::size_t index);
     // Reads min(out.size(), entry size) bytes from the start of the file; returns the count.
     std::size_t read_head(std::size_t index, std::span<std::byte> out);
     // Reads exactly out.size() bytes starting `offset` bytes into the file.
@@ -80,7 +80,7 @@ public:
     void copy_to(std::size_t index, io::File& out);
 
 private:
-    std::vector<Entry> entries_;
+    nx::vector<Entry> entries_;
     io::File pkg_;
     std::uint64_t archive_size_ = 0;
 };
@@ -104,7 +104,7 @@ private:
 
     ArchivePaths paths_;
     io::File pkg_;
-    std::vector<Entry> entries_;
+    nx::vector<Entry> entries_;
     std::uint32_t next_sector_ = 0;
 };
 

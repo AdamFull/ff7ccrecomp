@@ -9,12 +9,10 @@
 #include <exception>
 #include <filesystem>
 #include <functional>
-#include <map>
 #include <mutex>
 #include <string>
 #include <string_view>
 #include <thread>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atrac.hpp"
@@ -22,6 +20,8 @@
 #include "ff7cc/formats/pkg.hpp"
 #include "ff7cc/formats/psmf.hpp"
 #include "ff7cc/io/file.hpp"
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace fs = std::filesystem;
 using namespace ff7cc;
@@ -51,7 +51,7 @@ struct Options {
     unsigned jobs = std::max(1u, std::thread::hardware_concurrency() / 2);
     std::string only;
     std::size_t limit = static_cast<std::size_t>(-1);
-    std::vector<std::size_t> entries;
+    nx::vector<std::size_t> entries;
     bool force = false, keep_temp = false;
     int audio_quality = 6, video_crf = 26;
 };
@@ -125,16 +125,16 @@ public:
     }
 
     // RIFF ATRAC -> Ogg Vorbis (the raw decoder timeline; the runtime applies delay and loops itself).
-    bool cook_audio(std::size_t entry, const std::vector<std::byte>& file, std::uint64_t key) {
+    bool cook_audio(std::size_t entry, const nx::vector<std::byte>& file, std::uint64_t key) {
         return transcode("a" + std::to_string(entry) + ".at3", file, "", vorbis_args(), cooked::audio_path(out_, key));
     }
 
     // PSMF -> AV1 video (one frame per access unit, in display order) + Ogg Vorbis audio.
-    bool cook_movie(std::size_t entry, const std::vector<std::byte>& file, std::uint64_t key) {
+    bool cook_movie(std::size_t entry, const nx::vector<std::byte>& file, std::uint64_t key) {
         psmf::Header header;
         if (!psmf::parse_header(file, header)) return false;
         psmf::Demuxer demux;
-        std::vector<std::byte> video, audio;
+        nx::vector<std::byte> video, audio;
         std::uint64_t index = 0;
         const auto drain = [&] {
             for (auto& u : demux.units(psmf::kVideo)) {
@@ -184,8 +184,8 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
 #endif
     pkg::Reader reader(pkg::locate(game));
     Cooker cooker(opt, out);
-    std::vector<Task> tasks;
-    std::map<std::uint64_t, std::size_t> seen;  // key -> first entry
+    nx::vector<Task> tasks;
+    nx::map<std::uint64_t, std::size_t> seen;  // key -> first entry
     std::size_t audio_count = 0, movie_count = 0, skipped = 0, duplicates = 0;
 
     // RIFF ATRAC files stored inside other entries (e.g. containers the game hands to sceAtrac in place).
@@ -210,13 +210,13 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
             }
             ++audio_count;
             ++embedded;
-            std::vector<std::byte> clip(it, it + static_cast<std::ptrdiff_t>(length));
+            nx::vector<std::byte> clip(it, it + static_cast<std::ptrdiff_t>(length));
             tasks.push_back({"audio " + std::to_string(i) + "+" + std::to_string(at),
                              [&cooker, i, key, clip = std::move(clip)] { return cooker.cook_audio(i, clip, key); }});
         }
     };
 
-    std::vector<std::byte> head(2048);
+    nx::vector<std::byte> head(2048);
     for (std::size_t i = 0; i < reader.size(); ++i) {
         if (!opt.entries.empty() && std::find(opt.entries.begin(), opt.entries.end(), i) == opt.entries.end()) continue;
         const pkg::FileType type = reader.sniff(i);
@@ -252,7 +252,7 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
         }
         (is_audio ? audio_count : movie_count)++;
         tasks.push_back({(is_audio ? "audio " : "movie ") + std::to_string(i), [&reader, &cooker, i, key, is_audio] {
-                             std::vector<std::byte> file;
+                             nx::vector<std::byte> file;
                              {
                                  static std::mutex m;  // one pkg file handle
                                  std::lock_guard lock(m);
@@ -270,7 +270,7 @@ int cook(const fs::path& game, const fs::path& out, const Options& opt) {
 
     std::atomic<std::size_t> next{0}, done{0}, failed{0};
     std::mutex log;
-    std::vector<std::thread> pool;
+    nx::vector<std::thread> pool;
     for (unsigned j = 0; j < opt.jobs; ++j)
         pool.emplace_back([&] {
             for (std::size_t t; (t = next++) < tasks.size();) {

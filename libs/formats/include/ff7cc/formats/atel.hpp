@@ -26,10 +26,11 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <map>
 #include <span>
 #include <string_view>
-#include <vector>
+
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace ff7cc::atel {
 
@@ -48,14 +49,14 @@ struct Object {
     std::uint16_t attributes = 1;
     std::uint32_t name = 0;
     std::uint32_t unknown = 0;
-    std::vector<Method> methods;
+    nx::vector<Method> methods;
 
     friend bool operator==(const Object&, const Object&) = default;
 };
 
 struct Resource {
-    std::vector<std::byte> data;
-    std::vector<std::byte> slack;  // bytes after `data` up to the next resource (or end of file)
+    nx::vector<std::byte> data;
+    nx::vector<std::byte> slack;  // bytes after `data` up to the next resource (or end of file)
 
     friend bool operator==(const Resource&, const Resource&) = default;
 };
@@ -66,11 +67,11 @@ struct Module {
     std::uint8_t reserved = 0;
     std::uint8_t flags = 0x02;
     std::uint32_t seed = 0;
-    std::vector<Object> objects;
-    std::vector<std::byte> names;         // always decrypted in memory
-    std::vector<std::byte> code;
-    std::vector<std::byte> code_padding;  // filler between the code and the resource table
-    std::vector<Resource> resources;
+    nx::vector<Object> objects;
+    nx::vector<std::byte> names;         // always decrypted in memory
+    nx::vector<std::byte> code;
+    nx::vector<std::byte> code_padding;  // filler between the code and the resource table
+    nx::vector<Resource> resources;
 
     // NUL-terminated string at `offset` in the name pool (Shift-JIS for non-ASCII text).
     std::string_view name_at(std::uint32_t offset) const;
@@ -82,13 +83,13 @@ struct Module {
 bool is_atel(std::span<const std::byte> data);
 
 Module parse(std::span<const std::byte> data);
-std::vector<std::byte> serialize(const Module& module);
+nx::vector<std::byte> serialize(const Module& module);
 
 // Replaces resources while every other byte of the module stays where it was (the game may address resources by
 // their offsets): a replacement that fits in the old resource's space (its data and slack) is written in place,
 // a larger one is appended at the end of the module. Only the resource table entries of replaced resources change.
-std::vector<std::byte> replace_resources(std::span<const std::byte> module,
-                                         const std::map<std::size_t, std::vector<std::byte>>& replacements);
+nx::vector<std::byte> replace_resources(std::span<const std::byte> module,
+                                         const nx::map<std::size_t, nx::vector<std::byte>>& replacements);
 
 // The name-table cipher (symmetric): XOR with the low byte of successive game-LCG outputs,
 // state = state * 0x41C64E6D + 1234, output = (state >> 16) & 0x7FFF, seeded with Module::seed.

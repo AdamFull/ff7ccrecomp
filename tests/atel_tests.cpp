@@ -1,19 +1,19 @@
 #include <algorithm>
 #include <cstring>
 #include <string_view>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "test_main.hpp"
+#include "core/foundation/core/foundation.h"
 
 using namespace ff7cc;
 using namespace std::string_view_literals;
 
 namespace {
 
-std::vector<std::byte> bytes(std::string_view text) {
-    std::vector<std::byte> out(text.size());
+nx::vector<std::byte> bytes(std::string_view text) {
+    nx::vector<std::byte> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
 }
@@ -70,7 +70,7 @@ TEST_CASE("atel serialize/parse round-trip") {
 TEST_CASE("atel names are stored encrypted unless flagged plain") {
     auto m = sample_module();
     const auto encrypted = atel::serialize(m);
-    const auto pos = [](const std::vector<std::byte>& v) {
+    const auto pos = [](const nx::vector<std::byte>& v) {
         const auto r = bytes("Director");
         return std::search(v.begin(), v.end(), r.begin(), r.end()) != v.end();
     };

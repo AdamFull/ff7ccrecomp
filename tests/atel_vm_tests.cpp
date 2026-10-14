@@ -1,22 +1,22 @@
 #include <cstring>
-#include <set>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/atel_disasm.hpp"
 #include "ff7cc/formats/atel_vm.hpp"
 #include "test_main.hpp"
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 using namespace ff7cc;
 using namespace std::string_view_literals;
 
 namespace {
 
-std::vector<std::byte> bytes(std::string_view text) {
-    std::vector<std::byte> out(text.size());
+nx::vector<std::byte> bytes(std::string_view text) {
+    nx::vector<std::byte> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
 }
@@ -43,14 +43,14 @@ TEST_CASE("atel vm: decode immediates (big-endian, signed)") {
     CHECK(call.call.name == 4);
     CHECK(call.call.has_result == 1);
     CHECK(call.call.pop_slots == 3);
-    CHECK(call.call.types == std::vector<std::uint16_t>({1, 2}));
+    CHECK(call.call.types == nx::vector<std::uint16_t>({1, 2}));
 }
 
 TEST_CASE("atel vm: decode/encode round-trip") {
     const auto code = bytes(
         "\x05\x07\x80\x08\x12\x34\x09\xff\xff\xff\xff\x0a\x40\x49\x0f\xdb\x0b\x00\x00\x00\x05"
         "\x29\x00\x00\x00\x09\x00\x01\xff\xfe\x00\x07\x25\x00\x00\x00\x00\x01"sv);
-    std::vector<std::byte> out;
+    nx::vector<std::byte> out;
     for (const auto& insn : atel::decode_all(code)) atel::encode(insn, out);
     CHECK(out == code);
 }
@@ -62,7 +62,7 @@ TEST_CASE("atel vm: invalid or truncated bytecode is rejected") {
 }
 
 TEST_CASE("atel vm: mnemonics are unique and reversible") {
-    std::set<std::string_view> seen;
+    nx::set<std::string_view> seen;
     for (std::size_t op = 0; op < atel::kOpcodeCount; ++op) {
         const auto name = atel::opcode_info(static_cast<std::uint8_t>(op)).mnemonic;
         CHECK(!name.empty());

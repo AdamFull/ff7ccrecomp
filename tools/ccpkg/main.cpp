@@ -6,16 +6,16 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
-#include <map>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "ff7cc/io/file.hpp"
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace fs = std::filesystem;
 using namespace ff7cc;
@@ -80,7 +80,7 @@ int cmd_info(const fs::path& game) {
         std::size_t count = 0;
         std::uint64_t bytes = 0;
     };
-    std::map<pkg::FileType, Stat> stats;
+    nx::map<pkg::FileType, Stat> stats;
     for (std::size_t i = 0; i < reader.size(); ++i) {
         auto& s = stats[reader.sniff(i)];
         ++s.count;
@@ -147,7 +147,7 @@ int cmd_pack(const fs::path& extracted, const fs::path& out) {
         std::size_t index;
         std::string path;
     };
-    std::vector<Row> rows;
+    nx::vector<Row> rows;
     std::string line;
     std::size_t line_no = 0;
     bool header_seen = false;
@@ -193,7 +193,7 @@ int cmd_verify(const fs::path& a_dir, const fs::path& b_dir) {
     }
 
     constexpr std::size_t kChunk = 1 << 20;
-    std::vector<std::byte> buf_a(kChunk), buf_b(kChunk);
+    nx::vector<std::byte> buf_a(kChunk), buf_b(kChunk);
     std::size_t differences = 0;
     for (std::size_t i = 0; i < a.size(); ++i) {
         const auto size = a.entry(i).size;
@@ -218,7 +218,7 @@ int cmd_verify(const fs::path& a_dir, const fs::path& b_dir) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    const std::vector<std::string_view> args(argv + 1, argv + argc);
+    const nx::vector<std::string_view> args(argv + 1, argv + argc);
     if (args.empty() || args[0] == "-h" || args[0] == "--help") {
         usage();
         return args.empty() ? 2 : 0;

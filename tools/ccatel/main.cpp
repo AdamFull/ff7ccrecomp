@@ -8,7 +8,6 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
@@ -16,6 +15,7 @@
 #include "ff7cc/formats/atel_disasm.hpp"
 #include "ff7cc/formats/atel_vm.hpp"
 #include "ff7cc/io/file.hpp"
+#include "core/foundation/core/foundation.h"
 
 namespace fs = std::filesystem;
 using namespace ff7cc;
@@ -48,7 +48,7 @@ std::string hex(std::span<const std::byte> bytes) {
     return s;
 }
 
-std::vector<std::byte> unhex(std::string_view s) {
+nx::vector<std::byte> unhex(std::string_view s) {
     if (s.size() % 2) throw FormatError("odd-length hex string");
     auto nibble = [](char c) -> unsigned {
         if (c >= '0' && c <= '9') return static_cast<unsigned>(c - '0');
@@ -56,7 +56,7 @@ std::vector<std::byte> unhex(std::string_view s) {
         if (c >= 'A' && c <= 'F') return static_cast<unsigned>(c - 'A' + 10);
         throw FormatError("invalid hex digit");
     };
-    std::vector<std::byte> out(s.size() / 2);
+    nx::vector<std::byte> out(s.size() / 2);
     for (std::size_t i = 0; i < out.size(); ++i)
         out[i] = static_cast<std::byte>(nibble(s[2 * i]) << 4 | nibble(s[2 * i + 1]));
     return out;
@@ -187,7 +187,7 @@ int cmd_pack(const fs::path& dir, const fs::path& out_path) {
         if (line == kManifestHeader) header_seen = true;
         if (const auto c = line.find_first_of(";#"); c != std::string::npos) line.resize(c);
         std::istringstream fields(line);
-        std::vector<std::string> tok;
+        nx::vector<std::string> tok;
         for (std::string t; fields >> t;) tok.push_back(t);
         if (tok.empty()) continue;
 
@@ -205,7 +205,7 @@ int cmd_pack(const fs::path& dir, const fs::path& out_path) {
         } else if (key == "code" && tok.size() == 2) {
             code_path = dir / tok[1];
         } else if (key == "code_padding" && tok.size() <= 2) {
-            m.code_padding = tok.size() == 2 ? unhex(tok[1]) : std::vector<std::byte>{};
+            m.code_padding = tok.size() == 2 ? unhex(tok[1]) : nx::vector<std::byte>{};
         } else if (key == "object" && tok.size() == 4) {
             atel::Object obj;
             obj.name = parse_u32(tok[1]);
@@ -243,8 +243,8 @@ int cmd_pack(const fs::path& dir, const fs::path& out_path) {
     return 0;
 }
 
-int cmd_verify(const std::vector<fs::path>& inputs) {
-    std::vector<fs::path> files;
+int cmd_verify(const nx::vector<fs::path>& inputs) {
+    nx::vector<fs::path> files;
     for (const auto& p : inputs) {
         if (fs::is_directory(p)) {
             for (const auto& e : fs::directory_iterator(p))
@@ -268,7 +268,7 @@ int cmd_verify(const std::vector<fs::path>& inputs) {
                             diff.first - original.begin(), original.size(), rebuilt.size());
                 continue;
             }
-            std::vector<std::byte> code;
+            nx::vector<std::byte> code;
             for (const auto& insn : atel::decode_all(module.code)) atel::encode(insn, code);
             if (code != module.code) {
                 ++failed;
@@ -293,7 +293,7 @@ int cmd_verify(const std::vector<fs::path>& inputs) {
 }  // namespace
 
 int main(int argc, char** argv) {
-    const std::vector<std::string_view> args(argv + 1, argv + argc);
+    const nx::vector<std::string_view> args(argv + 1, argv + argc);
     if (args.empty() || args[0] == "-h" || args[0] == "--help") {
         usage();
         return args.empty() ? 2 : 0;
@@ -307,7 +307,7 @@ int main(int argc, char** argv) {
         if (cmd == "unpack" && args.size() == 3) return cmd_unpack(fs::path(args[1]), fs::path(args[2]));
         if (cmd == "pack" && args.size() == 3) return cmd_pack(fs::path(args[1]), fs::path(args[2]));
         if (cmd == "verify" && args.size() >= 2)
-            return cmd_verify(std::vector<fs::path>(args.begin() + 1, args.end()));
+            return cmd_verify(nx::vector<fs::path>(args.begin() + 1, args.end()));
         usage();
         return 2;
     } catch (const std::exception& e) {

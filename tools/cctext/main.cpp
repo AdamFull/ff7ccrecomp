@@ -10,18 +10,18 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
-#include <map>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/mbd.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "ff7cc/io/file.hpp"
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace fs = std::filesystem;
 using namespace ff7cc;
@@ -115,10 +115,10 @@ struct PoEntry {
     std::string context, id, str;
 };
 
-std::vector<PoEntry> read_po(const fs::path& path) {
+nx::vector<PoEntry> read_po(const fs::path& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in) throw IoError("cannot read " + path.string());
-    std::vector<PoEntry> out;
+    nx::vector<PoEntry> out;
     PoEntry cur;
     std::string* field = nullptr;
     const auto flush = [&] {
@@ -166,7 +166,7 @@ int export_po(const fs::path& game, const fs::path& out_path) {
     out << "# Crisis Core -Final Fantasy VII- text (FF7CCRECOMP cctext). msgctxt: archive entry.resource.message\n"
            "msgid \"\"\nmsgstr \"\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n";
     std::size_t messages = 0, tables = 0;
-    for_each_table(reader, [&](std::size_t entry, const atel::Module&, std::size_t r, const std::vector<mbd::Message>& table) {
+    for_each_table(reader, [&](std::size_t entry, const atel::Module&, std::size_t r, const nx::vector<mbd::Message>& table) {
         ++tables;
         for (std::size_t m = 0; m < table.size(); ++m) {
             out << "\nmsgctxt \"" << key_string({entry, r, m}) << "\"\nmsgid " << po_string(mbd::to_text(table[m], charset))
@@ -182,7 +182,7 @@ int verify(const fs::path& game) {
     pkg::Reader reader(pkg::locate(game));
     const auto charset = mbd::Charset::european();
     std::size_t tables = 0, messages = 0, failures = 0, unnamed = 0;
-    for_each_table(reader, [&](std::size_t entry, const atel::Module& module, std::size_t r, const std::vector<mbd::Message>& table) {
+    for_each_table(reader, [&](std::size_t entry, const atel::Module& module, std::size_t r, const nx::vector<mbd::Message>& table) {
         ++tables;
         if (mbd::serialize(table) != module.resources[r].data) {
             ++failures;
@@ -204,7 +204,7 @@ int verify(const fs::path& game) {
 
 int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir) {
     const auto charset = mbd::Charset::european();
-    std::map<Key, std::string> translated;
+    nx::map<Key, std::string> translated;
     for (const auto& e : read_po(po_path)) {
         if (e.context.empty() || e.str.empty() || e.str == e.id) continue;
         const auto key = parse_key(e.context);
@@ -212,7 +212,7 @@ int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir
         translated[*key] = e.str;
     }
     pkg::Reader reader(pkg::locate(game));
-    std::map<std::size_t, std::vector<std::pair<Key, std::string>>> by_entry;
+    nx::map<std::size_t, nx::vector<std::pair<Key, std::string>>> by_entry;
     for (const auto& [k, s] : translated) by_entry[k.entry].emplace_back(k, s);
 
     fs::create_directories(mod_dir / "pkg");
@@ -224,7 +224,7 @@ int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir
         atel::Module module = atel::parse(data);
         // Scripts address messages and resources by offset: changed messages are patched in place (mbd::patch) and
         // the tables replaced without moving other resources (atel::replace_resources).
-        std::map<std::size_t, std::map<std::size_t, mbd::Message>> changes;  // resource -> message -> content
+        nx::map<std::size_t, nx::map<std::size_t, mbd::Message>> changes;  // resource -> message -> content
         for (const auto& [k, text] : items) {
             if (k.resource >= module.resources.size() || !mbd::is_mbd(module.resources[k.resource].data))
                 throw FormatError("PO: " + key_string(k) + " is not a text table");
@@ -238,7 +238,7 @@ int build(const fs::path& game, const fs::path& po_path, const fs::path& mod_dir
                 std::fprintf(stderr, "%s: %s\n", key_string(k).c_str(), e.what());
             }
         }
-        std::map<std::size_t, std::vector<std::byte>> replacements;
+        nx::map<std::size_t, nx::vector<std::byte>> replacements;
         for (const auto& [r, messages] : changes) replacements[r] = mbd::patch(module.resources[r].data, messages);
         char name[16];
         std::snprintf(name, sizeof name, "%05zu.atel", entry);

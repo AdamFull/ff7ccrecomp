@@ -4,6 +4,7 @@
 #include <string>
 
 #include "ff7cc/error.hpp"
+#include "core/foundation/core/foundation.h"
 
 namespace ff7cc::atel {
 
@@ -142,12 +143,12 @@ std::uint16_t be16(std::span<const std::byte> code, std::size_t at) {
     return static_cast<std::uint16_t>(byte_at(code, at) << 8 | byte_at(code, at + 1));
 }
 
-void put_be16(std::vector<std::byte>& out, std::uint16_t v) {
+void put_be16(nx::vector<std::byte>& out, std::uint16_t v) {
     out.push_back(static_cast<std::byte>(v >> 8));
     out.push_back(static_cast<std::byte>(v));
 }
 
-void put_be32(std::vector<std::byte>& out, std::uint32_t v) {
+void put_be32(nx::vector<std::byte>& out, std::uint32_t v) {
     for (int shift = 24; shift >= 0; shift -= 8) out.push_back(static_cast<std::byte>(v >> shift));
 }
 
@@ -201,8 +202,8 @@ Instruction decode(std::span<const std::byte> code, std::size_t offset) {
     return insn;
 }
 
-std::vector<Instruction> decode_all(std::span<const std::byte> code) {
-    std::vector<Instruction> out;
+nx::vector<Instruction> decode_all(std::span<const std::byte> code) {
+    nx::vector<Instruction> out;
     for (std::size_t pc = 0; pc < code.size();) {
         out.push_back(decode(code, pc));
         pc += out.back().length;
@@ -210,7 +211,7 @@ std::vector<Instruction> decode_all(std::span<const std::byte> code) {
     return out;
 }
 
-void encode(const Instruction& insn, std::vector<std::byte>& out) {
+void encode(const Instruction& insn, nx::vector<std::byte>& out) {
     out.push_back(static_cast<std::byte>(insn.opcode));
     switch (opcode_info(insn.opcode).operand) {
         case K::None: break;

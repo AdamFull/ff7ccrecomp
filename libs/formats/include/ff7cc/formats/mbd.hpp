@@ -21,11 +21,12 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <map>
 #include <span>
 #include <string>
 #include <string_view>
-#include <vector>
+
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace ff7cc::mbd {
 
@@ -46,20 +47,20 @@ struct Token {
 };
 
 struct Message {
-    std::vector<std::vector<Token>> pages;  // each page includes its end token (0x03 or 0x04)
+    nx::vector<nx::vector<Token>> pages;  // each page includes its end token (0x03 or 0x04)
     friend bool operator==(const Message&, const Message&) = default;
 };
 
 bool is_mbd(std::span<const std::byte> data);
-std::vector<Message> parse(std::span<const std::byte> data);  // throws FormatError
-std::vector<std::byte> serialize(const std::vector<Message>& messages);
+nx::vector<Message> parse(std::span<const std::byte> data);  // throws FormatError
+nx::vector<std::byte> serialize(const nx::vector<Message>& messages);
 
 // Scripts address messages by their byte offset in the table (e.g. Mes(2128, 18, ...) = offset 2128 of resource
 // 18), so translated tables must keep every message where it was. A changed message that fits in its original
 // space is written there (the rest is zero-filled); a longer one keeps its header at the original offset while its
 // pages move to the end of the table (page offsets are relative to the message start). `changes` maps message
 // indices of `original` to their new content.
-std::vector<std::byte> patch(std::span<const std::byte> original, const std::map<std::size_t, Message>& changes);
+nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<std::size_t, Message>& changes);
 
 // Glyph index -> UTF-8 text. Unnamed glyphs are written as {G:n}.
 struct Charset {

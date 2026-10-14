@@ -6,6 +6,8 @@
 #include <type_traits>
 
 #include "ff7cc/error.hpp"
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace ff7cc::atel {
 
@@ -32,9 +34,9 @@ public:
         return v;
     }
 
-    std::vector<std::byte> bytes(std::size_t count) {
+    nx::vector<std::byte> bytes(std::size_t count) {
         require(pos_, count);
-        std::vector<std::byte> out(data_.begin() + pos_, data_.begin() + pos_ + count);
+        nx::vector<std::byte> out(data_.begin() + pos_, data_.begin() + pos_ + count);
         pos_ += count;
         return out;
     }
@@ -63,10 +65,10 @@ public:
     }
     void patch_u32(std::size_t at, std::uint32_t v) { std::memcpy(out_.data() + at, &v, sizeof v); }
     std::size_t size() const { return out_.size(); }
-    std::vector<std::byte> take() { return std::move(out_); }
+    nx::vector<std::byte> take() { return std::move(out_); }
 
 private:
-    std::vector<std::byte> out_;
+    nx::vector<std::byte> out_;
 };
 
 std::size_t align_up(std::size_t v, std::size_t a) { return (v + a - 1) / a * a; }
@@ -142,7 +144,7 @@ Module parse(std::span<const std::byte> data) {
     struct Span {
         std::uint32_t offset, size;
     };
-    std::vector<Span> spans(resource_count);
+    nx::vector<Span> spans(resource_count);
     for (auto& s : spans) {
         s.offset = in.read<std::uint32_t>();
         s.size = in.read<std::uint32_t>();
@@ -171,7 +173,7 @@ Module parse(std::span<const std::byte> data) {
     return m;
 }
 
-std::vector<std::byte> serialize(const Module& m) {
+nx::vector<std::byte> serialize(const Module& m) {
     Builder out;
     out.put_bytes(std::span(reinterpret_cast<const std::byte*>(kMagic), sizeof kMagic));
     out.put_value(m.version_major);
@@ -195,7 +197,7 @@ std::vector<std::byte> serialize(const Module& m) {
         }
     }
 
-    std::vector<std::byte> names = m.names;
+    nx::vector<std::byte> names = m.names;
     if (!(m.flags & kFlagPlainNames)) crypt_names(names, m.seed);
     out.put_bytes(names);
     out.put_bytes(m.code);
@@ -239,15 +241,15 @@ std::string_view resource_type(std::span<const std::byte> data) {
     return "bin";
 }
 
-std::vector<std::byte> replace_resources(std::span<const std::byte> module,
-                                         const std::map<std::size_t, std::vector<std::byte>>& replacements) {
+nx::vector<std::byte> replace_resources(std::span<const std::byte> module,
+                                         const nx::map<std::size_t, nx::vector<std::byte>>& replacements) {
     const Module m = parse(module);  // validates the layout
     std::size_t table = kHeaderSize;
     for (const auto& obj : m.objects) table += 12 + 8 * obj.methods.size();
     table = align_up(table + m.names.size() + m.code.size(), kResourceAlignment);
     const std::size_t count = m.resources.size(), base = table + 8 + 8 * count;
 
-    std::vector<std::byte> out(module.begin(), module.end());
+    nx::vector<std::byte> out(module.begin(), module.end());
     const auto read32 = [&](std::size_t at) {
         std::uint32_t v;
         std::memcpy(&v, out.data() + at, 4);

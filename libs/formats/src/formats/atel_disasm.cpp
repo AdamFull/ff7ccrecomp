@@ -5,11 +5,10 @@
 #include <charconv>
 #include <cmath>
 #include <cstdio>
-#include <map>
-#include <set>
-#include <vector>
 
 #include "ff7cc/formats/atel_vm.hpp"
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace ff7cc::atel {
 
@@ -62,12 +61,12 @@ std::string disassemble(const Module& m) {
     const auto insns = decode_all(m.code);
 
     // Labels: method entry points first, then call and jump targets.
-    std::map<std::uint32_t, std::vector<std::string>> labels;
+    nx::map<std::uint32_t, nx::vector<std::string>> labels;
     for (const auto& obj : m.objects)
         for (const auto& method : obj.methods)
             labels[method.code_offset].push_back(std::string(m.name_at(obj.name)) + "." +
                                                  std::string(m.name_at(method.name)));
-    std::set<std::uint32_t> calls, jumps;
+    nx::set<std::uint32_t> calls, jumps;
     for (const auto& insn : insns) {
         if (opcode_info(insn.opcode).operand != OperandKind::Code) continue;
         (insn.opcode == 0x28 ? calls : jumps).insert(static_cast<std::uint32_t>(insn.imm));

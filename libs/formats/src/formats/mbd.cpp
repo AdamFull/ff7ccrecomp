@@ -1,9 +1,10 @@
 #include "ff7cc/formats/mbd.hpp"
 
 #include <cstring>
-#include <map>
 
 #include "ff7cc/error.hpp"
+#include "core/foundation/core/foundation.h"
+#include "core/foundation/containers/map.h"
 
 namespace ff7cc::mbd {
 
@@ -16,7 +17,7 @@ std::uint32_t read32(std::span<const std::byte> d, std::size_t at) {
     return v;
 }
 
-void put32(std::vector<std::byte>& out, std::uint32_t v) {
+void put32(nx::vector<std::byte>& out, std::uint32_t v) {
     const auto* b = reinterpret_cast<const std::byte*>(&v);
     out.insert(out.end(), b, b + 4);
 }
@@ -49,9 +50,9 @@ bool is_mbd(std::span<const std::byte> data) {
     return data.size() >= 4 && std::memcmp(data.data(), "MBD\0", 4) == 0;
 }
 
-std::vector<Message> parse(std::span<const std::byte> data) {
+nx::vector<Message> parse(std::span<const std::byte> data) {
     if (!is_mbd(data)) throw FormatError("MBD: bad magic");
-    std::vector<Message> out;
+    nx::vector<Message> out;
     std::size_t p = 4;
     while (p < data.size()) {
         const std::uint32_t page_count = read32(data, p);
@@ -61,7 +62,7 @@ std::vector<Message> parse(std::span<const std::byte> data) {
         for (std::uint32_t i = 0; i < page_count; ++i) {
             const std::uint32_t length = read32(data, p + 4 + 8 * i), offset = read32(data, p + 8 + 8 * i);
             if (offset != expected) throw FormatError("MBD: pages are not contiguous");
-            std::vector<Token> page(length);
+            nx::vector<Token> page(length);
             for (std::uint32_t t = 0; t < length; ++t) {
                 const std::uint32_t w = read32(data, p + offset + 4 * t);
                 page[t] = {static_cast<std::uint16_t>(w), static_cast<std::uint16_t>(w >> 16)};
@@ -80,8 +81,8 @@ std::vector<Message> parse(std::span<const std::byte> data) {
     return out;
 }
 
-std::vector<std::byte> serialize(const std::vector<Message>& messages) {
-    std::vector<std::byte> out;
+nx::vector<std::byte> serialize(const nx::vector<Message>& messages) {
+    nx::vector<std::byte> out;
     for (const char c : {'M', 'B', 'D', '\0'}) out.push_back(static_cast<std::byte>(c));
     for (const auto& m : messages) {
         put32(out, static_cast<std::uint32_t>(m.pages.size()));
@@ -97,10 +98,10 @@ std::vector<std::byte> serialize(const std::vector<Message>& messages) {
     return out;
 }
 
-std::vector<std::byte> patch(std::span<const std::byte> original, const std::map<std::size_t, Message>& changes) {
+nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<std::size_t, Message>& changes) {
     const auto messages = parse(original);
     // Start offset and size of every message in the original table.
-    std::vector<std::size_t> starts, sizes;
+    nx::vector<std::size_t> starts, sizes;
     for (std::size_t p = 4; p < original.size();) {
         const std::uint32_t pages = read32(original, p);
         const std::uint32_t last_length = read32(original, p + 4 + 8 * (pages - 1));
@@ -109,7 +110,7 @@ std::vector<std::byte> patch(std::span<const std::byte> original, const std::map
         sizes.push_back(last_offset + 4 * static_cast<std::size_t>(last_length));
         p += sizes.back();
     }
-    std::vector<std::byte> out(original.begin(), original.end());
+    nx::vector<std::byte> out(original.begin(), original.end());
     const auto set32 = [&](std::size_t at, std::size_t v) {
         const auto u = static_cast<std::uint32_t>(v);
         std::memcpy(out.data() + at, &u, 4);
@@ -186,7 +187,7 @@ std::string to_text(const Message& message, const Charset& charset) {
 }
 
 Message from_text(std::string_view text, const Charset& charset) {
-    std::map<std::string, std::uint16_t, std::less<>> encode;
+    nx::map<std::string, std::uint16_t, std::less<>> encode;
     std::size_t longest = 1;
     for (std::size_t i = 0; i < charset.glyphs.size(); ++i)
         if (!charset.glyphs[i].empty()) {

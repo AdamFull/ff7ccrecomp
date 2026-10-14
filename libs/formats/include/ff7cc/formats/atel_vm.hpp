@@ -16,7 +16,8 @@
 #include <optional>
 #include <span>
 #include <string_view>
-#include <vector>
+
+#include "core/foundation/core/foundation.h"
 
 namespace ff7cc::atel {
 
@@ -48,7 +49,7 @@ struct NativeCall {
     std::uint32_t name = 0;
     std::uint8_t has_result = 0;
     std::int16_t pop_slots = 0;           // value-stack slots consumed by the call
-    std::vector<std::uint16_t> types;     // per-argument descriptors (meaning not yet known)
+    nx::vector<std::uint16_t> types;     // per-argument descriptors (meaning not yet known)
 };
 
 struct Instruction {
@@ -66,9 +67,9 @@ std::uint32_t instruction_length(std::span<const std::byte> code, std::size_t of
 Instruction decode(std::span<const std::byte> code, std::size_t offset);
 
 // Decodes the whole bytecode linearly. Throws FormatError on an invalid opcode or truncation.
-std::vector<Instruction> decode_all(std::span<const std::byte> code);
+nx::vector<Instruction> decode_all(std::span<const std::byte> code);
 
 // Appends the encoding of `insn` (its opcode/operands; offset and length are ignored).
-void encode(const Instruction& insn, std::vector<std::byte>& out);
+void encode(const Instruction& insn, nx::vector<std::byte>& out);
 
 }  // namespace ff7cc::atel

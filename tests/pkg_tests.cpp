@@ -2,26 +2,26 @@
 #include <filesystem>
 #include <random>
 #include <string>
-#include <vector>
 
 #include "ff7cc/error.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "test_main.hpp"
+#include "core/foundation/core/foundation.h"
 
 namespace fs = std::filesystem;
 using namespace ff7cc;
 
 namespace {
 
-std::vector<std::byte> bytes(std::string_view text) {
-    std::vector<std::byte> out(text.size());
+nx::vector<std::byte> bytes(std::string_view text) {
+    nx::vector<std::byte> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
 }
 
-std::vector<std::byte> random_bytes(std::size_t n, unsigned seed) {
+nx::vector<std::byte> random_bytes(std::size_t n, unsigned seed) {
     std::mt19937 rng(seed);
-    std::vector<std::byte> out(n);
+    nx::vector<std::byte> out(n);
     for (auto& b : out) b = static_cast<std::byte>(rng() & 0xff);
     return out;
 }
@@ -43,7 +43,7 @@ struct TempDir {
 }  // namespace
 
 TEST_CASE("index serialize/parse round-trip") {
-    const std::vector<pkg::Entry> entries{{0, 3088, 0}, {2, 76672, 0}, {40, 0, 0}, {40, 75008, 0}};
+    const nx::vector<pkg::Entry> entries{{0, 3088, 0}, {2, 76672, 0}, {40, 0, 0}, {40, 75008, 0}};
     const auto raw = pkg::serialize_index(entries);
     CHECK(raw.size() == entries.size() * pkg::kEntrySize);
     CHECK(pkg::parse_index(raw) == entries);
@@ -52,16 +52,16 @@ TEST_CASE("index serialize/parse round-trip") {
 }
 
 TEST_CASE("index with a truncated entry is rejected") {
-    const std::vector<std::byte> raw(13);
+    const nx::vector<std::byte> raw(13);
     CHECK_THROWS_AS(pkg::parse_index(raw), FormatError);
 }
 
 TEST_CASE("validate_index detects overlap and overrun") {
-    const std::vector<pkg::Entry> ok{{0, 100, 0}, {1, 2048, 0}, {2, 0, 0}};
+    const nx::vector<pkg::Entry> ok{{0, 100, 0}, {1, 2048, 0}, {2, 0, 0}};
     pkg::validate_index(ok, 2 * pkg::kSectorSize);
-    const std::vector<pkg::Entry> overlap{{0, 4096, 0}, {1, 10, 0}};
+    const nx::vector<pkg::Entry> overlap{{0, 4096, 0}, {1, 10, 0}};
     CHECK_THROWS_AS(pkg::validate_index(overlap, 1 << 20), FormatError);
-    const std::vector<pkg::Entry> overrun{{0, 4097, 0}};
+    const nx::vector<pkg::Entry> overrun{{0, 4097, 0}};
     CHECK_THROWS_AS(pkg::validate_index(overrun, 4096), FormatError);
 }
 
@@ -80,7 +80,7 @@ TEST_CASE("writer output reads back identically") {
     const fs::path game = dir.path / "PSP_GAME" / "USRDIR";
     fs::create_directories(game);
 
-    const std::vector<std::vector<std::byte>> files{
+    const nx::vector<nx::vector<std::byte>> files{
         bytes("Atel header"), random_bytes(pkg::kSectorSize, 1), {}, random_bytes(5000, 2), {}, bytes("x"),
     };
     {
@@ -102,7 +102,7 @@ TEST_CASE("writer output reads back identically") {
     CHECK(reader.sniff(0) == pkg::FileType::Atel);
     CHECK(reader.sniff(2) == pkg::FileType::Empty);
 
-    std::vector<std::byte> mid(10);
+    nx::vector<std::byte> mid(10);
     reader.read_at(3, 4000, mid);
     CHECK(std::equal(mid.begin(), mid.end(), files[3].begin() + 4000));
     CHECK_THROWS_AS(reader.read_at(3, 4995, mid), Error);

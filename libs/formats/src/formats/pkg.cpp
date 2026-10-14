@@ -8,6 +8,7 @@
 #include <string>
 
 #include "ff7cc/error.hpp"
+#include "core/foundation/core/foundation.h"
 
 static_assert(std::endian::native == std::endian::little, "big-endian hosts are not supported");
 
@@ -50,10 +51,10 @@ const TypeInfo& info(FileType type) {
 
 }  // namespace
 
-std::vector<Entry> parse_index(std::span<const std::byte> fse) {
+nx::vector<Entry> parse_index(std::span<const std::byte> fse) {
     if (fse.size() % kEntrySize != 0)
         throw FormatError("discimg.fse size " + std::to_string(fse.size()) + " is not a multiple of 12");
-    std::vector<Entry> entries(fse.size() / kEntrySize);
+    nx::vector<Entry> entries(fse.size() / kEntrySize);
     for (std::size_t i = 0; i < entries.size(); ++i) {
         const std::byte* p = fse.data() + i * kEntrySize;
         entries[i] = Entry{load_u32(p), load_u32(p + 4), load_u32(p + 8)};
@@ -61,8 +62,8 @@ std::vector<Entry> parse_index(std::span<const std::byte> fse) {
     return entries;
 }
 
-std::vector<std::byte> serialize_index(std::span<const Entry> entries) {
-    std::vector<std::byte> out(entries.size() * kEntrySize);
+nx::vector<std::byte> serialize_index(std::span<const Entry> entries) {
+    nx::vector<std::byte> out(entries.size() * kEntrySize);
     for (std::size_t i = 0; i < entries.size(); ++i) {
         std::byte* p = out.data() + i * kEntrySize;
         store_u32(p, entries[i].sector);
@@ -131,9 +132,9 @@ const Entry& Reader::entry(std::size_t index) const {
     return entries_[index];
 }
 
-std::vector<std::byte> Reader::read(std::size_t index) {
+nx::vector<std::byte> Reader::read(std::size_t index) {
     const Entry& e = entry(index);
-    std::vector<std::byte> data(e.size);
+    nx::vector<std::byte> data(e.size);
     pkg_.read_exact_at(e.offset(), data);
     return data;
 }
