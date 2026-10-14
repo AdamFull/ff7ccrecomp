@@ -15,14 +15,14 @@ param(
 $ErrorActionPreference = 'Continue'  # native tools print progress on stderr; exit codes are checked
 $root = Split-Path -Parent $PSScriptRoot
 $boot = Join-Path $root 'Crisis Core - Final Fantasy VII EU\PSP_GAME\SYSDIR\BOOT.BIN'
-$ccprx = Join-Path $root 'build\windows-x64-debug\tools\ccprx\ccprx.exe'
+$psprx = Join-Path $root 'build\windows-x64-debug\tools\psprx\psprx.exe'
 $out = Join-Path $root 'build\ghidra'
 New-Item -ItemType Directory -Force $out | Out-Null
 
-& $ccprx image $boot $Base "$out\boot_$Base.bin"
-if ($LASTEXITCODE) { throw 'ccprx image failed' }
-& $ccprx symbols $boot (Join-Path $root 'build\nids.tsv') "$out\symbols.tsv" $Base "$out\ghidra_symbols.txt"
-if ($LASTEXITCODE) { throw 'ccprx symbols failed' }
+& $psprx image $boot $Base "$out\boot_$Base.bin"
+if ($LASTEXITCODE) { throw 'psprx image failed' }
+& $psprx symbols $boot (Join-Path $root 'build\nids.tsv') "$out\symbols.tsv" $Base "$out\ghidra_symbols.txt"
+if ($LASTEXITCODE) { throw 'psprx symbols failed' }
 
 & (Join-Path $Ghidra 'support\analyzeHeadless.bat') $out FF7CC -overwrite `
     -import "$out\boot_$Base.bin" -loader BinaryLoader -loader-baseAddr $Base -processor $Language `

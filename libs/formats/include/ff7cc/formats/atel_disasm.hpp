@@ -3,6 +3,7 @@
 
 #include "ff7cc/formats/atel.hpp"
 #include "core/foundation/strings/utf8_string.h"
+#include "ff7cc/core.hpp"
 
 namespace ff7cc::atel {
 

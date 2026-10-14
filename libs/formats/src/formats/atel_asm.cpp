@@ -7,7 +7,7 @@
 #include <charconv>
 #include <cstdlib>
 
-#include "ff7cc/error.hpp"
+#include "psprecore/error.hpp"
 #include "ff7cc/formats/atel_vm.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"

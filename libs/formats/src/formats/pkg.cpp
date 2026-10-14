@@ -6,7 +6,7 @@
 #include <cstring>
 #include <limits>
 
-#include "ff7cc/error.hpp"
+#include "psprecore/error.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/strings/utf8_string.h"
 #include "core/foundation/strings/format.h"

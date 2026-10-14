@@ -14,10 +14,11 @@
 #include <cstdint>
 #include <span>
 
-#include "ff7cc/io/file.hpp"
-#include "ff7cc/io/path.hpp"
+#include "psprecore/io/file.hpp"
+#include "psprecore/io/path.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/strings/utf8_string.h"
+#include "ff7cc/core.hpp"
 
 namespace ff7cc::pkg {
 

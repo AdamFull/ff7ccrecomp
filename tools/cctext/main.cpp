@@ -10,12 +10,12 @@
 #include <exception>
 #include <optional>
 
-#include "ff7cc/error.hpp"
+#include "psprecore/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/mbd.hpp"
 #include "ff7cc/formats/pkg.hpp"
-#include "ff7cc/io/file.hpp"
-#include "ff7cc/io/path.hpp"
+#include "psprecore/io/file.hpp"
+#include "psprecore/io/path.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
 #include "core/foundation/platform/filesystem.h"

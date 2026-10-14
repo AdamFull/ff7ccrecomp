@@ -1,12 +1,12 @@
 // ff7cc: Crisis Core -Final Fantasy VII- (ULES-01044) on the recompiled-game runtime. Options: see the runtime's
-// frontend (ff7cc/platform/frontend.hpp).
+// frontend (psprecore/platform/frontend.hpp).
 
 #ifdef __ANDROID__
 #include <SDL3/SDL_main.h>  // main() becomes SDL_main, called by SDLActivity
 #endif
 
-#include "ff7cc/gpu/button_icons.hpp"
-#include "ff7cc/platform/frontend.hpp"
+#include "psprecore/gpu/button_icons.hpp"
+#include "psprecore/platform/frontend.hpp"
 #include "mods.hpp"
 
 namespace ff7cc::game {
@@ -33,6 +33,6 @@ constexpr platform::GameInfo kGame{
 }  // namespace ff7cc::game
 
 int main(int argc, char** argv) {
-    ff7cc::rt::gpu::set_icon_atlases(ff7cc::game::kIconAtlases);
-    return ff7cc::platform::run_game(ff7cc::game::kGame, argc, argv);
+    psprecore::rt::gpu::set_icon_atlases(ff7cc::game::kIconAtlases);
+    return psprecore::platform::run_game(ff7cc::game::kGame, argc, argv);
 }

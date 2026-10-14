@@ -7,7 +7,7 @@ including through function pointers, and the recompiled original stays available
 ## Writing a replacement
 
 ```cpp
-#include "ff7cc/game/game.hpp"
+#include "psprecore/game/game.hpp"
 
 using namespace ff7cc::game;
 
@@ -35,7 +35,7 @@ GAME_FUNC(08998F70, game_memcpy) {
 The generator has to know which functions are replaced, so that it renames them to `f_XXXXXXXX_orig`:
 
 ```
-ccrecomp "<game>/PSP_GAME/SYSDIR/BOOT.BIN" generated --overrides game
+psprecomp "<game>/PSP_GAME/SYSDIR/BOOT.BIN" generated --overrides game
 ```
 
 Run it after adding or removing a `GAME_FUNC`. CMake checks this when configuring: if `generated/` does not know a

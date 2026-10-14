@@ -20,7 +20,7 @@ Push-Location $root
 try {
     if (-not (Test-Path $Exe)) { throw "$Exe not found; build first (scripts\build.ps1 -Preset windows-x64-release)" }
     $recordings = Get-ChildItem $Dir -Filter *.txt | Where-Object {
-        (Get-Content $_.FullName -TotalCount 1) -like 'ff7cc-input *'
+        (Get-Content $_.FullName -TotalCount 1) -match '^(psprecore|ff7cc)-input '
     }
     if (-not $Update) { $recordings = $recordings | Where-Object { Test-Path ([IO.Path]::ChangeExtension($_.FullName, '.state')) } }
     if (-not $recordings) { throw "no recordings$(if (-not $Update) { ' with references (run with -Update first)' }) in $Dir" }

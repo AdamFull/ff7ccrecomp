@@ -5,10 +5,10 @@
 #include <memory>
 
 #include "ff7cc/formats/pkg.hpp"
-#include "ff7cc/io/file.hpp"
-#include "ff7cc/io/path.hpp"
-#include "ff7cc/runtime/io.hpp"
-#include "ff7cc/text.hpp"
+#include "psprecore/io/file.hpp"
+#include "psprecore/io/path.hpp"
+#include "psprecore/runtime/io.hpp"
+#include "psprecore/text.hpp"
 #include "core/foundation/containers/map.h"
 
 namespace ff7cc::game {

@@ -4,14 +4,14 @@
 #include <cstdio>
 #include <exception>
 
-#include "ff7cc/error.hpp"
+#include "psprecore/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/atel_asm.hpp"
 #include "ff7cc/formats/atel_disasm.hpp"
 #include "ff7cc/formats/atel_vm.hpp"
-#include "ff7cc/io/file.hpp"
-#include "ff7cc/io/path.hpp"
-#include "ff7cc/text.hpp"
+#include "psprecore/io/file.hpp"
+#include "psprecore/io/path.hpp"
+#include "psprecore/text.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/platform/filesystem.h"
 #include "core/foundation/strings/format.h"

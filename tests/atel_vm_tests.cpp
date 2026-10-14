@@ -1,6 +1,6 @@
 #include <cstring>
 
-#include "ff7cc/error.hpp"
+#include "psprecore/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/atel_disasm.hpp"
 #include "ff7cc/formats/atel_vm.hpp"

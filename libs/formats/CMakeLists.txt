@@ -10,5 +10,5 @@ add_library(ff7cc_game_formats STATIC
 add_library(ff7cc::game_formats ALIAS ff7cc_game_formats)
 
 target_include_directories(ff7cc_game_formats PUBLIC include)
-target_link_libraries(ff7cc_game_formats PUBLIC ff7cc::formats)
-ff7cc_target_defaults(ff7cc_game_formats)
+target_link_libraries(ff7cc_game_formats PUBLIC psprecore::formats)
+psprecore_target_defaults(ff7cc_game_formats)

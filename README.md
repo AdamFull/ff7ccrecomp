@@ -47,22 +47,22 @@ ccatel pack    dir/ file.atel           # assemble code.asm and rebuild the modu
 ccatel verify  extracted/pkg/files      # check every module rebuilds byte for byte
 ```
 
-`ccprx` works on the game executable (`PSP_GAME/SYSDIR/BOOT.BIN`, an unencrypted PRX):
+`psprx` works on the game executable (`PSP_GAME/SYSDIR/BOOT.BIN`, an unencrypted PRX):
 
 ```
-ccprx info    BOOT.BIN                  # module info, segments, imports/exports, relocation stats
-ccprx nids    "PSP SDK/pspsdk-MINPSPW/psp/sdk/lib" build/nids.tsv   # NID names from local SDK stubs
-ccprx imports BOOT.BIN build/nids.tsv   # all 197 imported system functions with names
-ccprx image   BOOT.BIN 0x08804000 build/boot.bin   # relocated memory image (PPSSPP's load base)
-ccprx disasm  BOOT.BIN                  # objdump-compatible listing (scripts/check_allegrex.ps1 diffs it)
-ccprx symbols BOOT.BIN build/nids.tsv build/symbols.tsv 0x08804000 build/ghidra_symbols.txt
+psprx info    BOOT.BIN                  # module info, segments, imports/exports, relocation stats
+psprx nids    "PSP SDK/pspsdk-MINPSPW/psp/sdk/lib" build/nids.tsv   # NID names from local SDK stubs
+psprx imports BOOT.BIN build/nids.tsv   # all 197 imported system functions with names
+psprx image   BOOT.BIN 0x08804000 build/boot.bin   # relocated memory image (PPSSPP's load base)
+psprx disasm  BOOT.BIN                  # objdump-compatible listing (psprecore/scripts/check_allegrex.ps1 diffs it)
+psprx symbols BOOT.BIN build/nids.tsv build/symbols.tsv 0x08804000 build/ghidra_symbols.txt
 ```
 
-`ccrecomp` translates BOOT.BIN into C (see [docs/recompiler.md](docs/recompiler.md)); the output goes to the
+`psprecomp` translates BOOT.BIN into C (see [psprecore/docs/recompiler.md](psprecore/docs/recompiler.md)); the output goes to the
 git-ignored `generated/` folder and is picked up by the build automatically:
 
 ```
-ccrecomp "Crisis Core - Final Fantasy VII EU/PSP_GAME/SYSDIR/BOOT.BIN" generated --overrides game
+psprecomp "Crisis Core - Final Fantasy VII EU/PSP_GAME/SYSDIR/BOOT.BIN" generated --overrides game
 ```
 
 `cctext` exports the game text to a PO file for translation and builds translated text into a mod folder;

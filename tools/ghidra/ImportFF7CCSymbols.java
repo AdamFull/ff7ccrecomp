@@ -1,4 +1,4 @@
-// Creates named functions from a `ccprx symbols ... <base> <ghidra.txt>` file ("<name> <address> f" per line).
+// Creates named functions from a `psprx symbols ... <base> <ghidra.txt>` file ("<name> <address> f" per line).
 // Usable from the GUI (Script Manager, asks for the file) or headless:
 //   analyzeHeadless ... -postScript ImportFF7CCSymbols.java <ghidra.txt> -scriptPath tools/ghidra
 //@category FF7CCRECOMP
@@ -17,7 +17,7 @@ public class ImportFF7CCSymbols extends GhidraScript {
     @Override
     protected void run() throws Exception {
         String[] args = getScriptArgs();
-        File file = args.length > 0 ? new File(args[0]) : askFile("ccprx symbols file (Ghidra format)", "Import");
+        File file = args.length > 0 ? new File(args[0]) : askFile("psprx symbols file (Ghidra format)", "Import");
         int created = 0, renamed = 0, failed = 0;
         try (BufferedReader in = new BufferedReader(new FileReader(file))) {
             String line;

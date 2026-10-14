@@ -18,7 +18,7 @@
 # -Install to put the app back).
 #
 # Needs: Android SDK (ANDROID_HOME) with NDK 29.0.14206865, JDK 17+, the Vulkan SDK (VULKAN_SDK: slangc, volk, VMA),
-# and generated/ from ccrecomp. CMake/Ninja are taken from Visual Studio when not on PATH.
+# and generated/ from psprecomp. CMake/Ninja are taken from Visual Studio when not on PATH.
 param(
     [switch]$Install,
     [switch]$InstallData,

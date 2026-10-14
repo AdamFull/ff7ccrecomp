@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/foundation/platform/filesystem.h"
+#include "ff7cc/core.hpp"
 
 namespace ff7cc::game {
 

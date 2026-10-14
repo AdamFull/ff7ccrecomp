@@ -26,6 +26,7 @@
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
 #include "core/foundation/strings/utf8_string.h"
+#include "ff7cc/core.hpp"
 
 namespace ff7cc::mbd {
 

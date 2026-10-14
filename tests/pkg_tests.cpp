@@ -2,7 +2,7 @@
 #include <cstdlib>
 #include <random>
 
-#include "ff7cc/error.hpp"
+#include "psprecore/error.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "test_main.hpp"
 #include "core/foundation/core/foundation.h"

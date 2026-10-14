@@ -1,9 +1,10 @@
-// The game's textures with PlayStation button icons (ff7cc/gpu/button_icons.hpp): positions and texel hashes only.
+// The game's textures with PlayStation button icons (psprecore/gpu/button_icons.hpp): positions and texel hashes only.
 // Find more with --tex-dump VBLANK DIR (files are named by the hash used here).
 
 #include <span>
 
-#include "ff7cc/gpu/button_icons.hpp"
+#include "ff7cc/core.hpp"
+#include "psprecore/gpu/button_icons.hpp"
 
 namespace ff7cc::game {
 

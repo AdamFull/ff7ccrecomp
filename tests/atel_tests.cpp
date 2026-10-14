@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <cstring>
 
-#include "ff7cc/error.hpp"
+#include "psprecore/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "test_main.hpp"
 #include "core/foundation/core/foundation.h"

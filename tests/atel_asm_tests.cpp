@@ -1,7 +1,7 @@
 #include <bit>
 #include <cstring>
 
-#include "ff7cc/error.hpp"
+#include "psprecore/error.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/atel_asm.hpp"
 #include "ff7cc/formats/atel_disasm.hpp"
