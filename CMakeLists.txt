@@ -18,6 +18,7 @@ if(PSPRECORE_BUILD_TOOLS)
 endif()
 
 if(PSPRECORE_BUILD_TESTS)
+    enable_testing()  # here too, so ctest from the build root runs psprecore's tests and the game's
     add_subdirectory(tests)
 endif()
 
