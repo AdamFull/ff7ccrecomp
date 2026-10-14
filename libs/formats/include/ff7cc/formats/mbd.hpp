@@ -16,7 +16,7 @@
 //
 // Text form (UTF-8) for editing: glyphs map through a Charset; "\n" is a newline, "{PAGE}" separates pages,
 // "{CHOICE:200}" is a choice list, "{C10}" / "{C10:0100}" other controls (number and argument in hex), and
-// "{G:84}" a glyph the charset does not name. The end-of-page and end-of-message tokens are implied.
+// "{G:150}" a glyph the charset does not name. The end-of-page and end-of-message tokens are implied.
 
 #include <array>
 #include <cstddef>
@@ -66,7 +66,7 @@ nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<s
 struct Charset {
     std::array<nx::string, 256> glyphs;
 
-    // The font of the European English release (glyphs confirmed from the text; a few rare ones stay unnamed).
+    // The font of the European English release: glyphs 0-95 of its sheet (the text uses no others).
     static Charset european();
 };
 

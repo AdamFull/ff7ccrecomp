@@ -36,11 +36,12 @@ otherwise.
 | `{PAGE}` | end of a page: the game waits for a button, then clears the box |
 | `{CHOICE:200}` | a choice list; the following lines are the options (the number is the game's argument, in hex) |
 | `{C10}`, `{C11:0100}` | other control codes (hex number and optional argument): button icons, inserted names, item names and counts, values. Keep them, moving them where the sentence needs them |
-| `{G:84}` | a glyph of the font that has no character assigned yet |
+| `{G:150}` | a glyph of the font by number, for glyphs that have no character assigned |
 
-The font has `A–Z`, `a–z`, `0–9` and `! ? " ' , . : - / ( ) % # *`, plus a few glyphs not named yet. Characters
-outside it (accents, other scripts) are rejected by `cctext build` with the message they appear in. Supporting
-them is the font work of Phase 9 (extended glyph sheets or a replaced text renderer).
+The font has `A–Z`, `a–z`, `0–9`, `! ? " ' , . : ; - / ( ) & < > % [ ] ¥ + # _ | ^ ° ~ * = ★ ☆ ℃ ㎝` and `△` (the
+Triangle button in a circle): glyphs 0–95 of its sheet, which also holds an italic copy. Characters outside it
+(accents, other scripts) are rejected by `cctext build` with the message they appear in. Supporting them is the
+font work of Phase 9 (extended glyph sheets or a replaced text renderer).
 
 ## Mods
 

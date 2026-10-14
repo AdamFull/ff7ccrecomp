@@ -155,9 +155,13 @@ Charset Charset::european() {
         c.glyphs[static_cast<std::size_t>(26 + i)] = nx::string(1, static_cast<char>('a' + i));
     }
     for (int i = 0; i < 10; ++i) c.glyphs[static_cast<std::size_t>(52 + i)] = nx::string(1, static_cast<char>('0' + i));
+    // The rest of the regular set, in the order of the font sheet (19 glyphs per row; an italic copy follows).
     const std::pair<int, const char*> punctuation[] = {
         {62, "!"}, {63, "?"}, {64, " "}, {65, "\""}, {66, "'"}, {67, ","}, {68, "."}, {69, ":"},
-        {71, "-"}, {72, "/"}, {73, "("}, {74, ")"}, {78, "%"}, {83, "#"}, {89, "*"},
+        {70, ";"}, {71, "-"}, {72, "/"}, {73, "("}, {74, ")"}, {75, "&"}, {76, "<"}, {77, ">"},
+        {78, "%"}, {79, "["}, {80, "]"}, {81, "¥"}, {82, "+"}, {83, "#"}, {84, "_"}, {85, "|"},
+        {86, "^"}, {87, "°"}, {88, "~"}, {89, "*"}, {90, "="}, {91, "★"}, {92, "☆"},
+        {93, "℃"}, {94, "㎝"}, {95, "△"},  // ¥ ° ★ ☆ ℃ ㎝, and the Triangle button in a circle
     };
     for (const auto& [i, s] : punctuation) c.glyphs[static_cast<std::size_t>(i)] = s;
     return c;

@@ -4,7 +4,7 @@
 //   cctext build  <game> <in.po> <mod dir>    modules whose translated text differs -> <mod dir>/pkg/EEEEE.atel
 //   cctext verify <game>                      binary and text round trips of every message
 //
-// See docs/localization.md for the text syntax ({PAGE}, {CHOICE:200}, {C10}, {G:84}).
+// See docs/localization.md for the text syntax ({PAGE}, {CHOICE:200}, {C10}, {G:150}).
 
 #include <cstdio>
 #include <exception>
