@@ -62,8 +62,11 @@ ccprx symbols BOOT.BIN build/nids.tsv build/symbols.tsv 0x08804000 build/ghidra_
 git-ignored `generated/` folder and is picked up by the build automatically:
 
 ```
-ccrecomp "Crisis Core - Final Fantasy VII EU/PSP_GAME/SYSDIR/BOOT.BIN" generated
+ccrecomp "Crisis Core - Final Fantasy VII EU/PSP_GAME/SYSDIR/BOOT.BIN" generated --overrides game
 ```
+
+Game functions can be replaced by hand-written C++ in `game/` (`GAME_FUNC`); see
+[docs/decompilation.md](docs/decompilation.md).
 
 `cccook` converts the game's music, voice clips, and movies into modern formats. The output is git-ignored,
 like everything else derived from the game:
