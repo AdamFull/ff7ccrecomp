@@ -84,6 +84,10 @@ ff7cc "Crisis Core - Final Fantasy VII EU"            # window: arrows/WASD, K/L
 ff7cc <game> --headless --vblanks 3600 --screenshot-every 300 shots/f --press 900 start   # automated runs
 ```
 
+Esc or F1 (gamepad: Guide, or both stick clicks) opens the pause menu: internal resolution, fullscreen
+(also F11 / Alt+Enter), volume, frame limiter and an FPS counter. Settings are kept in `ff7cc.ini` in the
+working directory. Saves go to `saves/`; the game's save and load screens open a slot picker.
+
 The NID database is generated locally and not committed. `tools/analysis/nids_from_ppsspp.py` fills the
 names the homebrew SDK lacks (e.g. `sceSasCore`) from a PPSSPP debug log.
 
