@@ -84,6 +84,17 @@ ff7cc "Crisis Core - Final Fantasy VII EU"            # window: arrows/WASD, K/L
 ff7cc <game> --headless --vblanks 3600 --screenshot-every 300 shots/f --press 900 start   # automated runs
 ```
 
+Recording and replaying play sessions (for bug reports and regression tests):
+
+```
+ff7cc <game> --record session.txt          # play normally; input and save picker answers are written down
+ff7cc <game> --headless --replay session.txt --state-hash 1000 --screenshot-every 600 shots/f
+```
+
+A recording stores the guest clock it started with and snapshots the save folder (`session.txt.saves`), so a replay
+reproduces the run exactly, also across renderers (the game's RAM matches between the software and Vulkan
+renderers). After the replay ends, live input takes over.
+
 Android: `scripts/build-android.ps1 -Install` builds and installs the APK (arm64, NDK r29). Copy the extracted game
 folder and `cooked/` to `Android/data/com.ff7ccrecomp/files/` on the device (for example with `adb push`). Logs go
 to logcat (tag `ff7cc`) and `ff7cc.log` in the same folder; test options can be passed with
