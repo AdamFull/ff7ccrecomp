@@ -84,6 +84,11 @@ ff7cc "Crisis Core - Final Fantasy VII EU"            # window: arrows/WASD, K/L
 ff7cc <game> --headless --vblanks 3600 --screenshot-every 300 shots/f --press 900 start   # automated runs
 ```
 
+Android: `scripts/build-android.ps1 -Install` builds and installs the APK (arm64, NDK r29). Copy the extracted game
+folder and `cooked/` to `Android/data/com.ff7ccrecomp/files/` on the device (for example with `adb push`). Logs go
+to logcat (tag `ff7cc`) and `ff7cc.log` in the same folder; test options can be passed with
+`adb shell am start -n com.ff7ccrecomp/.GameActivity -e args "--perf"`.
+
 Esc or F1 (gamepad: Guide, or both stick clicks) opens the pause menu: internal resolution, fullscreen
 (also F11 / Alt+Enter), volume, frame limiter and an FPS counter. Settings are kept in `ff7cc.ini` in the
 working directory. Saves go to `saves/`; the game's save and load screens open a slot picker.
