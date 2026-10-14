@@ -7,7 +7,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
-#include <functional>
 #include <mutex>
 #include <thread>
 
@@ -19,6 +18,7 @@
 #include "psprecore/io/file.hpp"
 #include "psprecore/io/path.hpp"
 #include "psprecore/text.hpp"
+#include "core/foundation/core/callable.h"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
 #include "core/foundation/platform/filesystem.h"
@@ -76,7 +76,7 @@ void write_file(nx::fs::path_view path, std::span<const std::byte> data) {
 
 struct Task {
     nx::string label;
-    std::function<bool()> work;
+    nx::unique_function<bool()> work;
 };
 
 class Cooker {
@@ -211,7 +211,9 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
             ++embedded;
             nx::vector<std::byte> clip(it, it + static_cast<std::ptrdiff_t>(length));
             tasks.push_back({nx::format("audio {}+{}", i, at),
-                             [&cooker, i, key, clip = std::move(clip)] { return cooker.cook_audio(i, clip, key); }});
+                             nx::unique_function<bool()>([&cooker, i, key, clip = std::move(clip)] {
+                                 return cooker.cook_audio(i, clip, key);
+                             })});
         }
     };
 
@@ -250,7 +252,8 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
             continue;
         }
         (is_audio ? audio_count : movie_count)++;
-        tasks.push_back({nx::format("{} {}", is_audio ? "audio" : "movie", i), [&reader, &cooker, i, key, is_audio] {
+        tasks.push_back({nx::format("{} {}", is_audio ? "audio" : "movie", i),
+                         nx::unique_function<bool()>([&reader, &cooker, i, key, is_audio] {
                              nx::vector<std::byte> file;
                              {
                                  static std::mutex m;  // one pkg file handle
@@ -258,7 +261,7 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
                                  file = reader.read(i);
                              }
                              return is_audio ? cooker.cook_audio(i, file, key) : cooker.cook_movie(i, file, key);
-                         }});
+                         })});
     }
     // Movies first: they take longest, so the pool stays busy.
     std::stable_partition(tasks.begin(), tasks.end(), [](const Task& t) { return t.label.starts_with("movie"); });
