@@ -1,0 +1,34 @@
+# --- Copyrighted / third-party inputs: never commit ---
+/PSP SDK/
+*.iso
+*.cso
+*.pbp
+*.prx
+BOOT.BIN
+EBOOT.BIN
+PARAM.SFO
+*.at3
+*.pmf
+
+# --- Build output ---
+/build/
+/out/
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.exe
+*.pdb
+
+# --- Tooling / editors ---
+__pycache__/
+*.pyc
+.venv/
+.vs/
+.vscode/
+.idea/
+*.user
+.DS_Store
+Thumbs.db

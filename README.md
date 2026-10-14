@@ -6,8 +6,12 @@ built by static recompilation and progressive decompilation.
 **This repository contains no game code or assets.** You need your own copy of the game
 (EU, ULES-01044). Everything derived from it is generated locally and never committed.
 
-- Work plan and ROM analysis: [PORT_PLAN.md](PORT_PLAN.md)
-- Throwaway analysis scripts: [tools/analysis/](tools/analysis/)
+The recompiler and runtime are [psprecore](https://github.com/AdamFull/psprecore), a git submodule in
+`psprecore/` (it brings [nx-foundation](https://github.com/AdamFull/nx-foundation) along); this repository adds
+what is specific to Crisis Core: its archive and script formats and tools, the game's own code (`src/`),
+translations, the Android app and the scripts.
+
+- Throwaway analysis scripts: [tools/analysis/](tools/analysis/) (generic ones in `psprecore/tools/analysis/`)
 
 ## Building
 
@@ -16,6 +20,7 @@ CRT used by `clang-cl`). On Windows, `scripts\build.ps1` sets up that environmen
 CMake commands from an *x64 Native Tools / Developer* prompt.
 
 ```
+git submodule update --init --recursive
 scripts\build.ps1                     # Windows: configure, build, run tests (-Preset, -NoTest)
 cmake --preset windows-x64-debug      # or linux-x64-debug
 cmake --build --preset windows-x64-debug
@@ -100,7 +105,7 @@ ff7cc <game> --headless --replay session.txt --state-hash 1000 --screenshot-ever
 A recording stores the guest clock it started with and snapshots the save folder (`session.txt.saves`), so a replay
 reproduces the run exactly, also across renderers (the game's RAM matches between the software and Vulkan
 renderers). After the replay ends, live input takes over.
-`scriptsegress.ps1` replays every recording in `buildec` (with `NAME.state` references, written by `-Update`)
+`scripts\regress.ps1` replays every recording in `build\rec` (with `NAME.state` references, written by `-Update`)
 and reports any difference in the game's RAM state.
 
 Android: `scripts/build-android.ps1 -Install` builds and installs the APK (arm64, NDK r29). Copy the extracted game
