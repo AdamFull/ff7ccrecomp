@@ -7,8 +7,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
-#include <mutex>
-#include <thread>
 
 #include "psprecore/error.hpp"
 #include "psprecore/formats/atrac.hpp"
@@ -23,6 +21,8 @@
 #include "core/foundation/containers/map.h"
 #include "core/foundation/platform/filesystem.h"
 #include "core/foundation/strings/format.h"
+#include "core/foundation/threading/sync.h"
+#include "core/foundation/threading/thread.h"
 #include "core/foundation/strings/utf8_string.h"
 
 using namespace ff7cc;
@@ -49,7 +49,7 @@ void usage() {
 
 struct Options {
     nx::string ffmpeg = "ffmpeg";
-    unsigned jobs = std::max(1u, std::thread::hardware_concurrency() / 2);
+    unsigned jobs = std::max(1u, nx::cpu::logical_core_count() / 2);
     nx::string only;
     std::size_t limit = static_cast<std::size_t>(-1);
     nx::vector<std::size_t> entries;
@@ -98,7 +98,7 @@ public:
         const nx::string part = nx::string(out.native()) + ".part";
         bool ok = false;
         for (int attempt = 0; attempt < 3 && !ok; ++attempt) {
-            if (attempt) std::this_thread::sleep_for(std::chrono::milliseconds(500 * attempt));
+            if (attempt) nx::this_thread::sleep_for(std::chrono::milliseconds(500 * attempt));
             try {
                 write_file(in, data);
             } catch (const std::exception&) {
@@ -113,7 +113,7 @@ public:
         }
         for (int attempt = 0; attempt < 5; ++attempt) {
             if (nx::fs::rename(part, out)) return true;
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            nx::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
         return false;
     }
@@ -256,8 +256,8 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
                          nx::unique_function<bool()>([&reader, &cooker, i, key, is_audio] {
                              nx::vector<std::byte> file;
                              {
-                                 static std::mutex m;  // one pkg file handle
-                                 std::lock_guard lock(m);
+                                 static nx::mutex m;  // one pkg file handle
+                                 nx::scoped_lock lock(m);
                                  file = reader.read(i);
                              }
                              return is_audio ? cooker.cook_audio(i, file, key) : cooker.cook_movie(i, file, key);
@@ -271,8 +271,8 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
                  audio_count, embedded, movie_count, opt.jobs, skipped, duplicates);
 
     std::atomic<std::size_t> next{0}, done{0}, failed{0};
-    std::mutex log;
-    nx::vector<std::thread> pool;
+    nx::mutex log;
+    nx::vector<nx::thread> pool;
     for (unsigned j = 0; j < opt.jobs; ++j)
         pool.emplace_back([&] {
             for (std::size_t t; (t = next++) < tasks.size();) {
@@ -280,12 +280,12 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
                 try {
                     ok = tasks[t].work();
                 } catch (const std::exception& e) {
-                    std::lock_guard lock(log);
+                    nx::scoped_lock lock(log);
                     std::fprintf(stderr, "%s: %s\n", tasks[t].label.c_str(), e.what());
                 }
                 const std::size_t n = ++done;
                 if (!ok) ++failed;
-                std::lock_guard lock(log);
+                nx::scoped_lock lock(log);
                 std::fprintf(stderr, "[%zu/%zu] %s%s\n", n, tasks.size(), tasks[t].label.c_str(), ok ? "" : "  FAILED");
             }
         });
