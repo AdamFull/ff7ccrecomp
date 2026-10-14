@@ -36,6 +36,7 @@ public class GameActivity extends SDLActivity {
             final WindowManager.LayoutParams attributes = getWindow().getAttributes();
             attributes.preferredRefreshRate = hz;
             getWindow().setAttributes(attributes);
+            hideSystemBars();  // new window attributes bring the system bars back
         });
     }
 
