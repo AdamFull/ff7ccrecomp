@@ -65,6 +65,25 @@ git-ignored `generated/` folder and is picked up by the build automatically:
 ccrecomp "Crisis Core - Final Fantasy VII EU/PSP_GAME/SYSDIR/BOOT.BIN" generated
 ```
 
+`cccook` converts the game's music, voice clips, and movies into modern formats. The output is git-ignored,
+like everything else derived from the game:
+- ATRAC3/ATRAC3plus audio becomes Ogg Vorbis.
+- PSMF movies become AV1 (IVF) video plus Ogg Vorbis audio.
+
+It needs the FFmpeg command-line tool, at cook time only. Runs can be resumed. The game looks for `cooked/` in
+the working directory (or use `--cooked DIR`). Without it, music and movie audio play as silence.
+
+```
+cccook "Crisis Core - Final Fantasy VII EU" cooked
+```
+
+Running the game:
+
+```
+ff7cc "Crisis Core - Final Fantasy VII EU"            # window: arrows/WASD, K/L/J/I = ×/○/□/△, Q/E, Enter/Backspace
+ff7cc <game> --headless --vblanks 3600 --screenshot-every 300 shots/f --press 900 start   # automated runs
+```
+
 The NID database is generated locally and not committed. `tools/analysis/nids_from_ppsspp.py` fills the
 names the homebrew SDK lacks (e.g. `sceSasCore`) from a PPSSPP debug log.
 
