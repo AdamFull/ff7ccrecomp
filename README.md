@@ -100,6 +100,8 @@ ff7cc <game> --headless --replay session.txt --state-hash 1000 --screenshot-ever
 A recording stores the guest clock it started with and snapshots the save folder (`session.txt.saves`), so a replay
 reproduces the run exactly, also across renderers (the game's RAM matches between the software and Vulkan
 renderers). After the replay ends, live input takes over.
+`scriptsegress.ps1` replays every recording in `buildec` (with `NAME.state` references, written by `-Update`)
+and reports any difference in the game's RAM state.
 
 Android: `scripts/build-android.ps1 -Install` builds and installs the APK (arm64, NDK r29). Copy the extracted game
 folder and `cooked/` to `Android/data/com.ff7ccrecomp/files/` on the device (for example with `adb push`). Logs go
