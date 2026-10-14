@@ -92,14 +92,14 @@ Running the game:
 
 ```
 ff7cc "Crisis Core - Final Fantasy VII EU"            # window: arrows/WASD, K/L/J/I = ×/○/□/△, Q/E, Enter/Backspace
-ff7cc <game> --headless --vblanks 3600 --screenshot-every 300 shots/f --press 900 start   # automated runs
+ff7cc <game> --headless --vblanks 3600 --screenshot-every 300:shots/f --press 900:start   # automated runs
 ```
 
 Recording and replaying play sessions (for bug reports and regression tests):
 
 ```
 ff7cc <game> --record session.txt          # play normally; input and save picker answers are written down
-ff7cc <game> --headless --replay session.txt --state-hash 1000 --screenshot-every 600 shots/f
+ff7cc <game> --headless --replay session.txt --state-hash 1000 --screenshot-every 600:shots/f
 ```
 
 A recording stores the guest clock it started with and snapshots the save folder (`session.txt.saves`), so a replay
