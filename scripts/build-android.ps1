@@ -163,6 +163,9 @@ try {
     if ($Smoke) {
         # The app writes its log to files/ff7cc.log; a library that fails to load never gets there.
         $log = "$remoteFiles/ff7cc.log"
+        # Right after an install, Android is still handling the package replacement and may restart a fresh launch
+        # without its extras (the arguments); let it settle first.
+        if ($Install) { Start-Sleep -Seconds 5 }
         & $adb -s $script:target shell rm -f $log | Out-Null
         & $adb -s $script:target shell am force-stop $package | Out-Null
         & $adb -s $script:target shell "am start -n $package/.GameActivity -e args '--no-audio --vblanks 120'" | Out-Null
