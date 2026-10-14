@@ -65,6 +65,9 @@ git-ignored `generated/` folder and is picked up by the build automatically:
 ccrecomp "Crisis Core - Final Fantasy VII EU/PSP_GAME/SYSDIR/BOOT.BIN" generated --overrides game
 ```
 
+`cctext` exports the game text to a PO file for translation and builds translated text into a mod folder;
+see [docs/localization.md](docs/localization.md).
+
 Game functions can be replaced by hand-written C++ in `game/` (`GAME_FUNC`); see
 [docs/decompilation.md](docs/decompilation.md).
 
