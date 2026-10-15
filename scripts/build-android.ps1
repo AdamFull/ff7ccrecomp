@@ -3,6 +3,7 @@
 #   scripts\build-android.ps1                         # -> android\app\build\outputs\apk\release\app-release.apk
 #   scripts\build-android.ps1 -Install                # also installs the APK (adb)
 #   scripts\build-android.ps1 -Install -InstallData   # ... and copies the game folder and cooked/ to the device
+#                                                     # (packing edited HD textures first, as a Windows build does)
 #   scripts\build-android.ps1 -InstallData            # only copies the data (no build); the app must be installed
 #   scripts\build-android.ps1 -Install -Device Pixel_10_Pro   # pick the device: adb serial or model (adb devices -l)
 #   scripts\build-android.ps1 -ListDevices            # shows the connected devices and exits
@@ -95,6 +96,22 @@ function Initialize-AppFolder {
     }
 }
 
+# Packs edited textures (assets/textures, assets/textures-hd) into cooked/textures, as every Windows build does:
+# the Android build has no host tools, so without this the phone would get whatever a Windows build packed last.
+function Update-Textures {
+    $assets = Join-Path $root 'assets\textures'
+    if (-not (Test-Path (Join-Path $assets 'index.tsv'))) { return }
+    $psptex = Join-Path $root 'build\windows-x64-release\psprecore\tools\psptex\psptex.exe'
+    if (-not (Test-Path $psptex)) {
+        Write-Host 'Building psptex (windows-x64-release) to pack the textures...'
+        & (Join-Path $PSScriptRoot 'build.ps1') -Preset windows-x64-release -Target psptex
+        if (-not (Test-Path $psptex)) { throw "psptex was not built ($psptex)" }
+    }
+    Write-Host 'Packing edited textures (assets/textures, assets/textures-hd -> cooked/textures)...'
+    & $psptex pack $assets $CookedDir --layer (Join-Path $root 'assets\textures-hd')
+    if ($LASTEXITCODE) { throw 'psptex pack failed' }
+}
+
 function Copy-GameData {
     if (-not (Test-Path (Join-Path $GameDir 'PSP_GAME\SYSDIR\BOOT.BIN'))) { throw "No game at $GameDir (expected PSP_GAME\SYSDIR\BOOT.BIN)." }
     Initialize-AppFolder
@@ -108,15 +125,25 @@ function Copy-GameData {
             Invoke-Adb push --sync $_.FullName "$remoteFiles/cooked/"
         }
         # Baked HD textures: phones sample ASTC, so only those files go (hard links in a staging folder).
+        Update-Textures
         $textures = Join-Path $CookedDir 'textures'
         if (Test-Path $textures) {
             $stage = Join-Path $root 'build\android-stage\textures'
             if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
             New-Item -ItemType Directory -Force $stage | Out-Null
-            Get-ChildItem $textures -Filter '*.astc.ktx2' | ForEach-Object {
+            $files = @(Get-ChildItem $textures -Filter '*.astc.ktx2')
+            $files | ForEach-Object {
                 New-Item -ItemType HardLink -Path (Join-Path $stage $_.Name) -Target $_.FullName | Out-Null
             }
+            Write-Host "Copying $($files.Count) HD textures (ASTC; unchanged ones are skipped)..."
             Invoke-Adb push --sync $stage "$remoteFiles/cooked/"
+            # push --sync never removes anything: textures no longer packed stay on the phone. Listed, not deleted.
+            $local = @{}; $files | ForEach-Object { $local[$_.Name] = $true }
+            $stale = @(& $adb -s $script:target shell "ls '$remoteFiles/cooked/textures'" 2>$null |
+                       Where-Object { $_ -like '*.astc.ktx2' -and -not $local.ContainsKey($_.Trim()) })
+            if ($stale.Count) {
+                Write-Warning "$($stale.Count) HD textures on the phone are no longer packed (they still replace the originals there): $remoteFiles/cooked/textures: $(($stale | Select-Object -First 5) -join ', ')$(if ($stale.Count -gt 5) { ', ...' })"
+            }
         }
     } else {
         Write-Warning "No cooked media at $CookedDir (run cccook); music and movies will be silent or black."

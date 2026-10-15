@@ -12,10 +12,11 @@ fixes - touch hundreds of files at once.
 
 Needs the GitHub CLI (gh, logged in) for the history, cached in data/third-party/FF7CCUP-history.tsv for the
 checked-out commit. psptex match compares every picture of the pack (an original whose closest picture is not
-hand-made gets nothing) and lists matches and near misses in assets/textures-hd/matched.tsv.
+hand-made gets nothing) and lists matches and near misses in assets/textures-hd/matched.tsv. Pictures already in
+assets/textures-hd are never removed or replaced (it is edited by hand); only missing ones are added.
 
-The pack has no license; its interface readme asks for credit and allows changes. It stays in the git-ignored
-data/ and assets/ folders: never commit or redistribute it.
+The pack has no license; its interface readme asks for credit and allows changes. It stays out of this (public)
+repository: data/ and assets/ are git-ignored here (assets/textures-hd is versioned in its own private repository).
 """
 
 import argparse
@@ -112,24 +113,23 @@ def main():
     print(len(picked), 'hand-made pictures in the pack', file=sys.stderr)
     subprocess.run([str(args.psptex), 'match', str(args.pack), str(ROOT / 'assets/textures'), str(out),
                     '--only', str(only)], check=True)
-    # The verified pictures, listed in verified.txt; ones an earlier run placed and no longer verified go.
-    listed = out / 'verified.txt'
-    before = set(listed.read_text(encoding='utf-8').split()) if listed.exists() else set()
-    placed = []
+    # The verified pictures. assets/textures-hd is edited by hand: nothing there is ever removed or replaced, only
+    # missing pictures are added (to take a new version, delete the picture by hand first).
+    added = kept = 0
     for ours, theirs in VERIFIED.items():
-        if (ROOT / 'assets/textures' / ours).exists() and (args.pack / theirs).exists():
-            (out / ours).parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(args.pack / theirs, out / ours)
-            placed.append(ours)
-    matched = {line.split('\t')[0] for line in (out / 'matched.tsv').read_text(encoding='utf-8').splitlines()
-               if line and not line.startswith('#')}
-    for ours in before - set(placed) - matched:
-        (out / ours).unlink(missing_ok=True)
-    listed.write_text('\n'.join(placed) + '\n', encoding='utf-8')
+        if not (ROOT / 'assets/textures' / ours).exists() or not (args.pack / theirs).exists():
+            continue
+        if (out / ours).exists():
+            kept += 1
+            continue
+        (out / ours).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(args.pack / theirs, out / ours)
+        added += 1
+    credits = out / 'FF7CCUP UI readme (credits).txt'
     readme = args.pack / 'ui_upscale/Crisis Core UI Upscale Readme.txt'
-    if readme.exists():  # their credits travel with the pictures
-        shutil.copyfile(readme, out / 'FF7CCUP UI readme (credits).txt')
-    print('verified extras:', len(VERIFIED), '- pack them with a build', file=sys.stderr)
+    if readme.exists() and not credits.exists():  # their credits travel with the pictures
+        shutil.copyfile(readme, credits)
+    print(f'verified pictures: {added} added, {kept} already there (kept) - pack them with a build', file=sys.stderr)
 
 
 if __name__ == '__main__':
