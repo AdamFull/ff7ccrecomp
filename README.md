@@ -108,16 +108,20 @@ silence and movies stay black.
 cccook data/original data/cooked
 ```
 
-HD textures are baked offline, too (optional). Collect the textures while playing or replaying, then upscale them
-into `data/cooked/textures` with [Real-ESRGAN ncnn](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) (any 4x
-upscaler works through `--upscaler`). The "HD textures" setting switches them off and on in the game. Only scene
-textures are upscaled: the interface (menus, HUD, text) stays as it is unless a mod brings hand-drawn replacements
-(`mods/<mod>/textures/<hash>.png`, named by `--tex-dump`).
+Textures are edited by hand in `assets/textures`, and the build packs the edited ones into `data/cooked/textures`,
+which the game draws instead of the originals (the "HD textures" setting switches them off and on):
 
-```
-ff7cc <game> --replay session.txt --unthrottled --tex-collect texlib    # or play normally; collections add up
-psptex bake texlib data/cooked --realesrgan path\to\realesrgan-ncnn-vulkan.exe --scale 4
-```
+1. Collect the textures the game draws, by playing or replaying (collections add up across sessions):
+   `scripts\run.ps1 --replay ..\data\recordings\long.txt --unthrottled --tex-collect ..\data\collected-textures`
+2. Unpack them for editing, laid out by where they come from in the archive
+   (`assets/textures/<entry>.<type>[/r<resource>]/<offset>_<hash>.png`; pictures already there are kept):
+   `cctex unpack data/collected-textures data/original assets/textures`
+3. Edit the pictures, at any size up to 2048x2048, keeping their names.
+4. Build: edited pictures are packed (PNG, BC7 for PCs, ASTC for phones, with mipmaps); a picture changed back to
+   the original loses its replacement. `psptex pack assets/textures data/cooked` does the same by hand.
+
+`psptex bake` can also upscale a collection's scene textures with a neural upscaler (Real-ESRGAN ncnn); the
+results are mixed, so hand-edited textures are the main path.
 
 Running the game:
 
