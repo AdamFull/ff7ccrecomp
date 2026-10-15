@@ -96,7 +96,7 @@ function Initialize-AppFolder {
     }
 }
 
-# Packs edited textures (assets/textures, assets/textures-hd) into cooked/textures, as every Windows build does:
+# Packs edited textures (assets/textures, assets/textures-hd, assets/textures-ai) into cooked/textures, as every Windows build does:
 # the Android build has no host tools, so without this the phone would get whatever a Windows build packed last.
 function Update-Textures {
     $assets = Join-Path $root 'assets\textures'
@@ -107,8 +107,8 @@ function Update-Textures {
         & (Join-Path $PSScriptRoot 'build.ps1') -Preset windows-x64-release -Target psptex
         if (-not (Test-Path $psptex)) { throw "psptex was not built ($psptex)" }
     }
-    Write-Host 'Packing edited textures (assets/textures, assets/textures-hd -> cooked/textures)...'
-    & $psptex pack $assets $CookedDir --layer (Join-Path $root 'assets\textures-hd')
+    Write-Host 'Packing edited textures (assets/textures, textures-hd, textures-ai -> cooked/textures)...'
+    & $psptex pack $assets $CookedDir --layer (Join-Path $root 'assets\textures-hd') --layer (Join-Path $root 'assets\textures-ai')
     if ($LASTEXITCODE) { throw 'psptex pack failed' }
 }
 

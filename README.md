@@ -140,8 +140,22 @@ Third-party packs keep their own terms: they stay in the git-ignored `data/` and
 its history shows were edited by hand (its other scene textures are neural-network upscales). Its credits are copied
 next to the pictures.
 
-`psptex bake` can also upscale a collection's scene textures with a neural upscaler (Real-ESRGAN ncnn); the
-results are mixed, so hand-edited textures are the main path.
+Everything without a hand-made version can be enhanced by a local image-editing model: `scripts/enhance_textures.py`
+sends each unedited scene texture with no picture in `assets/textures-hd` to FLUX.2 [klein] 4B in ComfyUI Desktop
+(started without a window by `scripts/comfyui_enhance.py`; needs `flux-2-klein-4b-fp8.safetensors`,
+`qwen_3_4b.safetensors` and `flux2-vae.safetensors` in its models) with an instruction to sharpen and add detail
+without changing anything. `psptex enhance` fits each result back to the texture: its size, its transparency, and
+the original's colours and shapes where the model drifted (`--detail`). Results go to `assets/textures-ai`, packed
+below the hand-made layers; pictures there are never replaced (delete one to have it made again). Review sheets
+(original | model | result) go to `data/enhance-review/`:
+
+```
+python scripts/enhance_textures.py --limit 20
+python scripts/enhance_textures.py --prompt-file my_prompt.txt
+```
+
+`psptex enhance --upscaler "<command> {in} {out}"` takes any other folder-to-folder upscaler (a chaiNNer chain run
+from its command line, for one).
 
 Running the game:
 
