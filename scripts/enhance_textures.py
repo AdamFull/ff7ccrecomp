@@ -64,6 +64,9 @@ def main():
     ap.add_argument('--detail', type=int, default=100,
                     help='percent of the original\'s colours and shapes pulled back where the model drifted '
                          '(psptex enhance --detail; default 100)')
+    ap.add_argument('--strength', type=int, default=100,
+                    help='percent of the model\'s new detail kept, the rest from the original smoothly enlarged '
+                         '(psptex enhance --strength; default 100, lower is softer)')
     ap.add_argument('--2d', dest='with_2d', action='store_true', help='interface textures too')
     ap.add_argument('--redo', action='store_true',
                     help='make again the pictures an earlier run made that nobody changed since (edited ones stay)')
@@ -76,6 +79,7 @@ def main():
         upscaler += ' --prompt-file "%s"' % args.prompt_file.resolve()
     cmd = [str(args.psptex), 'enhance', str(ROOT / 'assets/textures'), str(ROOT / 'assets/textures-ai'),
            '--skip-layer', str(ROOT / 'assets/textures-hd'), '--upscaler', upscaler, '--detail', str(args.detail),
+           '--strength', str(args.strength),
            '--temp', str(tmp), '--keep-temp']
     if args.limit:
         cmd += ['--limit', str(args.limit)]

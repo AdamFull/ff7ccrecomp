@@ -31,9 +31,12 @@ NODES = ['UNETLoader', 'CLIPLoader', 'VAELoader', 'LoadImage', 'ImageScaleToTota
          'EmptyFlux2LatentImage', 'Flux2Scheduler', 'CLIPTextEncode', 'ConditioningZeroOut', 'VAEEncode',
          'ReferenceLatent', 'CFGGuider', 'RandomNoise', 'KSamplerSelect', 'SamplerCustomAdvanced', 'VAEDecode',
          'SaveImage']
-PROMPT = ('Upscale this video game texture to 4x resolution and enhance it: sharp, clean and highly detailed, as if '
-          'painted at the higher resolution. Remove blur, pixelation, noise and compression artifacts. Keep exactly '
-          'the same layout, shapes, positions, proportions, colours and lighting; do not add, remove or move anything.')
+# Asking for "sharp and highly detailed" gave crunchy textures (grit, scratches, hard micro-contrast) that lose the
+# game's painted look; this keeps it.
+PROMPT = ('Upscale this video game texture to 4x resolution. Keep the original\'s look exactly: its soft, painted '
+          'style, smooth gradients, the same amount of contrast and the same level of detail, only cleaner and at '
+          'higher resolution. Do not sharpen, do not add grit, scratches, cracks, noise or new details. Keep the same '
+          'layout, shapes, colours and lighting.')
 
 
 def request(url, data=None, headers=None):
