@@ -19,14 +19,16 @@ if(PSPRECORE_BUILD_TOOLS)
 
     # Edited textures (assets/textures, laid out by cctex unpack) are packed into the cooked media by every build
     # (psptex pack compares the pictures' pixels with the originals, so it is quick, and file times do not matter:
-    # a picture restored from a backup keeps its old time).
+    # a picture restored from a backup keeps its old time). assets/textures-hd (psptex match, e.g. from another
+    # project's texture pack) fills in where a picture in assets/textures is unedited.
     set(FF7CC_COOKED_DIR "${PROJECT_SOURCE_DIR}/data/cooked" CACHE PATH "cooked media the game loads")
     set(_ff7cc_textures "${PROJECT_SOURCE_DIR}/assets/textures")
     if(EXISTS "${_ff7cc_textures}/index.tsv")
         add_custom_target(ff7cc_textures ALL
             COMMAND psptex pack "${_ff7cc_textures}" "${FF7CC_COOKED_DIR}"
+                    --layer "${PROJECT_SOURCE_DIR}/assets/textures-hd"
             DEPENDS psptex
-            COMMENT "Packing edited textures (assets/textures -> cooked/textures)"
+            COMMENT "Packing edited textures (assets/textures, assets/textures-hd -> cooked/textures)"
             VERBATIM)
     endif()
 endif()

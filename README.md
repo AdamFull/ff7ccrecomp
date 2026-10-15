@@ -20,7 +20,8 @@ data/           your game copy and everything derived from it (git-ignored):
   generated/      C code recompiled from BOOT.BIN (psprecomp)
   cooked/         what the game loads besides the disc: audio, movies, textures
   recordings/     play sessions for replays and regression tests
-assets/         game assets unpacked for editing, packed by the build (git-ignored)
+assets/         game assets unpacked for editing (textures/), high-resolution matches (textures-hd/), packed by
+                the build (git-ignored)
 run/            the working directory for playing: settings, saves, mods, shader cache (git-ignored)
 build/          CMake output
 ```
@@ -118,7 +119,21 @@ which the game draws instead of the originals (the "HD textures" setting switche
    `cctex unpack data/collected-textures data/original assets/textures`
 3. Edit the pictures, at any size up to 2048x2048, keeping their names.
 4. Build: edited pictures are packed (PNG, BC7 for PCs, ASTC for phones, with mipmaps); a picture changed back to
-   the original loses its replacement. `psptex pack assets/textures data/cooked` does the same by hand.
+   the original loses its replacement. `psptex pack assets/textures data/cooked --layer assets/textures-hd` does
+   the same by hand.
+
+High-resolution pictures from elsewhere, such as a PPSSPP texture pack for the game (any version: they are matched
+by what they show, not by name or hash), are mapped onto the unpacked originals with `psptex match`. Each picture
+that is a whole multiple of an original's size and, shrunk back, looks like it, is copied into `assets/textures-hd`
+at the original's path; `assets/textures-hd/matched.tsv` lists every match and near miss with its score. The build
+uses `assets/textures-hd` where the picture in `assets/textures` is unedited, so hand edits still win:
+
+```
+psptex match data/third-party/<pack> assets/textures assets/textures-hd
+```
+
+Only textures already unpacked into `assets/textures` can be matched; collecting more scenes (step 1) widens it.
+Third-party packs keep their own terms: they stay in the git-ignored `data/` and `assets/`, never in the repository.
 
 `psptex bake` can also upscale a collection's scene textures with a neural upscaler (Real-ESRGAN ncnn); the
 results are mixed, so hand-edited textures are the main path.

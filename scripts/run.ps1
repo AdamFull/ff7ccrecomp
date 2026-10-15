@@ -5,6 +5,7 @@
 #   scripts\run.ps1                                                    # play
 #   scripts\run.ps1 --replay ..\data\recordings\long.txt --unthrottled  # replay a recording
 #   scripts\run.ps1 -Preset windows-x64-debug --perf
+[CmdletBinding(PositionalBinding = $false)]  # game arguments must not land in -Preset
 param(
     [string]$Preset = 'windows-x64-release',
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$GameArgs
@@ -17,6 +18,7 @@ $run = Join-Path $root 'run'
 New-Item -ItemType Directory -Force $run | Out-Null
 Push-Location $run
 try {
+    $ErrorActionPreference = 'Continue'  # the game logs to stderr; redirected (2>&1), Stop would end the run
     & $exe (Join-Path $root 'data\original') --cooked (Join-Path $root 'data\cooked') @GameArgs
 } finally {
     Pop-Location
