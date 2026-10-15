@@ -180,9 +180,10 @@ A on Nintendo, L on the keyboard; on a touch screen, a finger on the picture) fo
 game runs through the rest of the movie without picture and sound in a second or two, so what follows plays as
 usual. The opening movie behind the title screen is not skippable (Start opens the title menu there).
 
-The field camera also turns freely, besides the game's own L / R steps: with a gamepad's right stick, or on a
-touch screen by dragging a finger across the picture where there are no on-screen buttons (the right half, away
-from the face buttons). Like L and R, it stops where walls would hide the player.
+The camera also turns freely, besides the field's own L / R steps: with a gamepad's right stick, or on a touch
+screen by dragging a finger across the picture where there are no on-screen buttons (the right half, away from the
+face buttons). In the field it turns around Zack and, like L and R, stops where walls would hide him; in battle it
+also tilts, and the turn lasts until the battle ends.
 
 The NID database is generated locally and not committed. `tools/analysis/nids_from_ppsspp.py` fills the
 names the homebrew SDK lacks (e.g. `sceSasCore`) from a PPSSPP debug log.
