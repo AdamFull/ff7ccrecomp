@@ -6,6 +6,7 @@
 #endif
 
 #include "psprecore/gpu/button_icons.hpp"
+#include "psprecore/gpu/ui_font.hpp"
 #include "psprecore/platform/frontend.hpp"
 #include "psprecore/runtime/hle.hpp"
 #include "mods.hpp"
@@ -13,6 +14,7 @@
 namespace ff7cc::game {
 
 extern const std::span<const rt::gpu::IconAtlas> kIconAtlases;
+rt::gpu::UiFont ui_font();
 
 // Movies the player cannot skip ("sceMpeg: movie <key>" in the log): the title screen plays over this one, and it
 // ending without input starts the logo loop again.
@@ -39,6 +41,7 @@ constexpr platform::GameInfo kGame{
 
 int main(int argc, char** argv) {
     psprecore::rt::gpu::set_icon_atlases(ff7cc::game::kIconAtlases);
+    psprecore::rt::gpu::set_ui_font(ff7cc::game::ui_font());
     psprecore::rt::set_unskippable_movies(ff7cc::game::kUnskippableMovies);
     return psprecore::platform::run_game(ff7cc::game::kGame, argc, argv);
 }

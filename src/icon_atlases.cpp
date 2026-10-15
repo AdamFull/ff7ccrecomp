@@ -1,10 +1,13 @@
-// The game's textures with PlayStation button icons (psprecore/gpu/button_icons.hpp): positions and texel hashes only.
-// Find more with --tex-dump VBLANK DIR (files are named by the hash used here).
+// The game's textures with PlayStation button icons (psprecore/gpu/button_icons.hpp) and its text font
+// (psprecore/gpu/ui_font.hpp): positions, cell layout and texel hashes only. Find more with --tex-dump VBLANK:DIR
+// (files are named by the hash used here).
 
 #include <span>
 
 #include "ff7cc/core.hpp"
+#include "ff7cc/formats/mbd.hpp"
 #include "psprecore/gpu/button_icons.hpp"
+#include "psprecore/gpu/ui_font.hpp"
 
 namespace ff7cc::game {
 
@@ -27,5 +30,31 @@ constexpr IconAtlas kAtlases[] = {
 }  // namespace
 
 extern const std::span<const IconAtlas> kIconAtlases = kAtlases;
+
+// The text font: 13x14 cells, 19 to a row (glyph n in column n % 19, row n / 19), the characters cctext maps
+// (ff7cc/formats/mbd.hpp); its Triangle icon lends its disc to the prompts the port adds.
+rt::gpu::UiFont ui_font() {
+    rt::gpu::UiFont font;
+    font.atlas_hash = kAtlases[1].hash;
+    font.cell_width = 13;
+    font.cell_height = 14;
+    font.columns = 19;
+    font.ascii.fill(-1);
+    const mbd::Charset charset = mbd::Charset::european();
+    for (std::size_t g = 0; g < charset.glyphs.size(); ++g)
+        if (const nx::string& c = charset.glyphs[g]; c.size() == 1 && static_cast<unsigned char>(c[0]) < 128)
+            font.ascii[static_cast<unsigned char>(c[0])] = static_cast<std::int16_t>(g);
+    font.button = kFontSheet[0];
+    // Loaded at boot, long before the first subtitle: swizzled 4-bit indices, the palette (8888) in CCFF7ENUK's data.
+    font.texels = 0x09EC7C60;
+    font.palette = 0x08A2B3C0;
+    font.format = kAtlases[1].format;
+    font.width = kAtlases[1].width;
+    font.height = kAtlases[1].height;
+    font.buffer_width = 256;
+    font.swizzled = true;
+    font.palette_format = 3;
+    return font;
+}
 
 }  // namespace ff7cc::game
