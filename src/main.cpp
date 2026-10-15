@@ -9,6 +9,7 @@
 #include "psprecore/gpu/ui_font.hpp"
 #include "psprecore/platform/frontend.hpp"
 #include "psprecore/runtime/hle.hpp"
+#include "fonts.hpp"
 #include "mods.hpp"
 
 namespace ff7cc::game {
@@ -25,6 +26,7 @@ namespace {
 void mount(nx::string_view mods_dir) {
     install_archive();
     set_mods(mods_dir);
+    collect_mod_glyphs(mods_dir);
 }
 
 constexpr platform::GameInfo kGame{
@@ -33,6 +35,7 @@ constexpr platform::GameInfo kGame{
     .folder = "Crisis Core - Final Fantasy VII EU",
     .load_base = 0x08804000,
     .mount = mount,
+    .loaded = install_mod_glyphs,
 };
 
 }  // namespace

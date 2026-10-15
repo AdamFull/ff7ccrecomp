@@ -6,6 +6,7 @@ add_library(ff7cc_game_formats STATIC
     src/formats/atel_disasm.cpp
     src/formats/atel_asm.cpp
     src/formats/mbd.cpp
+    src/formats/font.cpp
 )
 add_library(ff7cc::game_formats ALIAS ff7cc_game_formats)
 

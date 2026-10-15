@@ -64,7 +64,7 @@ nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<s
 
 // Glyph index -> UTF-8 text. Unnamed glyphs are written as {G:n}.
 struct Charset {
-    std::array<nx::string, 256> glyphs;
+    std::array<nx::string, 512> glyphs;  // by glyph index (the game has 96; mods add more, font.hpp)
 
     // The font of the European English release: glyphs 0-95 of its sheet (the text uses no others).
     static Charset european();

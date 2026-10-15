@@ -3,6 +3,10 @@
 //   cctext export <game> <out.po>             every message; msgctxt "EEEEE.RR.MMM" = entry, resource, message
 //   cctext build  <game> <in.po> <mod dir>    modules whose translated text differs -> <mod dir>/pkg/EEEEE.atel
 //   cctext verify <game>                      binary and text round trips of every message
+//   cctext font-export <game> <out.png>       the regular font's sheet as a picture to draw new characters in
+//   cctext font-import <game> <in.png> <mod dir>  the edited sheet -> <mod dir>/pkg/01472.bin
+//
+// With <mod dir>/font/glyphs.txt (ff7cc/formats/font.hpp), build also encodes the characters the mod adds.
 //
 // See docs/localization.md for the text syntax ({PAGE}, {CHOICE:200}, {C10}, {G:150}).
 
@@ -13,6 +17,7 @@
 #include "psprecore/error.hpp"
 #include "psprecore/cli.hpp"
 #include "ff7cc/formats/atel.hpp"
+#include "ff7cc/formats/font.hpp"
 #include "ff7cc/formats/mbd.hpp"
 #include "ff7cc/formats/pkg.hpp"
 #include "psprecore/io/file.hpp"
@@ -22,6 +27,7 @@
 #include "core/foundation/platform/filesystem.h"
 #include "core/foundation/strings/format.h"
 #include "core/foundation/strings/utf8_string.h"
+#include "png.hpp"
 
 using namespace ff7cc;
 
@@ -199,8 +205,91 @@ int verify(nx::fs::path_view game) {
     return failures ? 1 : 0;
 }
 
+// The game's characters plus those the mod adds (<mod dir>/font/glyphs.txt), if any.
+mbd::Charset mod_charset(nx::fs::path_view mod_dir) {
+    mbd::Charset charset = mbd::Charset::european();
+    const nx::string path = path_join(mod_dir.native(), "font/glyphs.txt");
+    if (!is_file(path)) return charset;
+    const auto text = nx::fs::file_read_text(path);
+    if (!text.has_value()) throw IoError("cannot read '" + path + "'");
+    for (const auto& g : font::parse_glyphs(text.value())) charset.glyphs[static_cast<std::size_t>(g.index)] = g.text;
+    std::fprintf(stderr, "characters from %s\n", path.c_str());
+    return charset;
+}
+
+// ---- the font sheet --------------------------------------------------------------------------------------------
+
+struct FontFile {
+    nx::vector<std::byte> data;
+    font::Picture sheet;
+    nx::vector<std::uint32_t> palette;
+};
+
+FontFile read_font(nx::fs::path_view game) {
+    pkg::Reader reader(pkg::locate(game));
+    FontFile f;
+    f.data = reader.read(font::kFontEntry);
+    const auto items = font::items(f.data);
+    if (items.size() <= font::kTextPalette) throw FormatError("font: unexpected layout");
+    f.sheet = font::picture(f.data, items[font::kRegularSheet]);
+    f.palette = font::palette(f.data, items[font::kTextPalette]);
+    return f;
+}
+
+int font_export(nx::fs::path_view game, const nx::string& png) {
+    const FontFile f = read_font(game);
+    const auto indices = font::unswizzle4(std::span(f.data).subspan(f.sheet.texels, f.sheet.bytes), f.sheet.width,
+                                          f.sheet.height);
+    nx::vector<std::uint32_t> rgba(indices.size());
+    for (std::size_t i = 0; i < indices.size(); ++i) rgba[i] = f.palette[indices[i]];
+    if (!cctext::write_png(png, rgba.data(), f.sheet.width, f.sheet.height)) throw IoError("cannot write '" + png + "'");
+    std::fprintf(stderr, "%dx%d sheet -> %s (cells %dx%d, %d to a row; free: glyphs 96-113, 228-341)\n", f.sheet.width,
+                 f.sheet.height, png.c_str(), font::kCellWidth, font::kCellHeight, font::kColumns);
+    return 0;
+}
+
+// Each pixel becomes the palette colour nearest to it, so new characters should be drawn with the sheet's own
+// colours (copy them from existing glyphs).
+int font_import(nx::fs::path_view game, const nx::string& png, nx::fs::path_view mod_dir) {
+    FontFile f = read_font(game);
+    nx::vector<std::uint32_t> rgba;
+    int w = 0, h = 0;
+    if (!cctext::read_png(png, rgba, w, h)) throw IoError("cannot read '" + png + "'");
+    if (w != f.sheet.width || h != f.sheet.height)
+        throw FormatError(nx::format("the picture must be {}x{} like the sheet", f.sheet.width, f.sheet.height));
+    const auto channel = [](std::uint32_t c, int i) { return static_cast<int>((c >> (i * 8)) & 0xFF); };
+    nx::vector<std::uint8_t> indices(rgba.size());
+    std::size_t inexact = 0;
+    for (std::size_t i = 0; i < rgba.size(); ++i) {
+        int best = 0, best_distance = 1 << 30;
+        for (int p = 0; p < 16; ++p) {
+            int d = 0;
+            for (int k = 0; k < 4; ++k) {
+                const int diff = channel(rgba[i], k) - channel(f.palette[static_cast<std::size_t>(p)], k);
+                d += diff * diff;
+            }
+            if (channel(rgba[i], 3) == 0 && channel(f.palette[static_cast<std::size_t>(p)], 3) == 0) d = 0;  // transparent
+            if (d < best_distance) {
+                best_distance = d;
+                best = p;
+            }
+        }
+        if (best_distance) ++inexact;
+        indices[i] = static_cast<std::uint8_t>(best);
+    }
+    font::swizzle4(indices, f.sheet.width, f.sheet.height, std::span(f.data).subspan(f.sheet.texels, f.sheet.bytes));
+    const nx::string pkg_dir = path_join(mod_dir.native(), "pkg");
+    if (!nx::fs::create_directories(pkg_dir)) throw IoError("cannot create directory '" + pkg_dir + "'");
+    char name[16];
+    std::snprintf(name, sizeof name, "%05zu.bin", font::kFontEntry);
+    io::write_all(path_join(pkg_dir, name), f.data);
+    std::fprintf(stderr, "%s -> %s (%zu pixels not in the palette, mapped to the nearest colour)\n", png.c_str(),
+                 path_join(pkg_dir, name).c_str(), inexact);
+    return 0;
+}
+
 int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view mod_dir) {
-    const auto charset = mbd::Charset::european();
+    const auto charset = mod_charset(mod_dir);
     nx::map<Key, nx::string> translated;
     for (const auto& e : read_po(po_path)) {
         if (e.context.empty() || e.str.empty() || e.str == e.id) continue;
@@ -261,12 +350,22 @@ int main(int argc, char** argv) {
         .positional("po", po, "translated PO file")
         .positional("mod-dir", mod_dir, "mod folder to write");
     cli.command("verify", "binary and text round trips of every message").positional("game", game, "the game");
+    nx::string png;
+    cli.command("font-export", "the regular font's sheet as a picture to draw new characters in")
+        .positional("game", game, "the game")
+        .positional("out", png, "PNG file to write");
+    cli.command("font-import", "an edited sheet -> <mod dir>/pkg/01472.bin")
+        .positional("game", game, "the game")
+        .positional("png", png, "the edited sheet")
+        .positional("mod-dir", mod_dir, "mod folder to write");
     nx::string command;
     if (const int code = parse_command_line(cli, argc, argv, &command); code >= 0) return code;
     try {
         if (command == "export") return export_po(game, po);
         if (command == "build") return build(game, po, mod_dir);
         if (command == "verify") return verify(game);
+        if (command == "font-export") return font_export(game, png);
+        if (command == "font-import") return font_import(game, png, mod_dir);
         std::fputs(cli.help().c_str(), stderr);
         return 2;
     } catch (const std::exception& e) {

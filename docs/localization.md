@@ -39,9 +39,34 @@ otherwise.
 | `{G:150}` | a glyph of the font by number, for glyphs that have no character assigned |
 
 The font has `A–Z`, `a–z`, `0–9`, `! ? " ' , . : ; - / ( ) & < > % [ ] ¥ + # _ | ^ ° ~ * = ★ ☆ ℃ ㎝` and `△` (the
-Triangle button in a circle): glyphs 0–95 of its sheet, which also holds an italic copy. Characters outside it
-(accents, other scripts) are rejected by `cctext build` with the message they appear in. Supporting them is the
-font work of Phase 9 (extended glyph sheets or a replaced text renderer).
+Triangle button in a circle): glyphs 0–95 of its sheet, which also holds an italic copy. Other characters are
+rejected by `cctext build` with the message they appear in, unless the translation's mod adds them.
+
+## Adding characters
+
+A mod can draw up to 132 more characters into the free cells of the regular font (accented letters, Cyrillic,
+Greek...):
+
+```
+cctext font-export "Crisis Core - Final Fantasy VII EU" font.png      # the sheet: 13x14 cells, 19 to a row
+# draw the new characters into free cells, with the sheet's own colours (copy them from existing glyphs)
+cctext font-import "Crisis Core - Final Fantasy VII EU" font.png mods/french
+```
+
+`font-import` writes `mods/french/pkg/01472.bin` (the font file with the edited sheet; colours that are not in its
+palette become the nearest one). Then list the characters in `mods/french/font/glyphs.txt`:
+
+```
+# glyph index, character, advance (pixels the pen moves on; 'e' advances 6, 'M' 9)
+228 é 6
+229 Ж 10
+```
+
+Glyph n is cell n % 19 of row n / 19. Free are glyphs 96–113 (the rest of row 5; the same cells of row 11 hold their
+italic shapes) and 228–341 (rows 12–17, regular only: italic text cannot use them). `cctext build` reads the file
+when it builds into that mod folder, and the game reads it at start to give the font table room for the new
+glyphs' advances (docs/text_rendering.md). Verified on the opening subtitles. Menus that keep their own copy of the
+font's advances may not measure added characters correctly yet.
 
 ## Mods
 

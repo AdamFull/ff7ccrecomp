@@ -49,10 +49,19 @@ Neither bounds the glyph index. A glyph index of 96 or more reads its advance pa
 its cell from the free part of the sheet (for the regular font: indices 96-113 are the rest of row 5, 114-227 hit
 the italic rows, 228-341 rows 12-17).
 
-## Adding characters (plan)
+## Adding characters
 
-1. Replace the font sheet (texture replacement, PORT_PLAN item 14) with one that fills the free cells with new
-   glyphs (accented Latin, Cyrillic: up to ~150 cells for the regular font).
-2. Give the renderer advances for the new indices: replace `f_088BADC0` / `f_088BB260` (and the copies' users) in
-   C++, or point the font table at larger records.
-3. Let `cctext` map the new characters to those indices (a charset file next to the mod's font).
+How mods add characters (usage in docs/localization.md):
+
+1. The sheets live in archive entry 1472 (ff7cc/formats/font.hpp: a list of "IMG" pictures and 16-colour palettes;
+   item 0 the regular sheet, item 3 the palette text is drawn with). `cctext font-import` writes the edited sheet's
+   palette indices back into that file, so every coloured variant of the font and both renderers get the new
+   glyphs.
+2. The records are static data in CCFF7ENUK with room for 96 advances. At start (GameInfo::loaded, before the game
+   runs) `src/fonts.cpp` copies the regular and italic records into kernel-heap memory with room for every added
+   glyph, fills in the advances from `font/glyphs.txt`, and points the font table at the copies. Without such mods
+   nothing changes.
+3. `cctext build` maps the added characters to their glyph indices.
+
+Not yet covered: the 26 UI objects with their own copy of the regular record (they would measure added characters
+as zero-width), the small font, and italic shapes for glyphs 228-341 (their italic cells would lie below the sheet).
