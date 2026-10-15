@@ -65,6 +65,8 @@ def main():
                     help='percent of the original\'s colours and shapes pulled back where the model drifted '
                          '(psptex enhance --detail; default 100)')
     ap.add_argument('--2d', dest='with_2d', action='store_true', help='interface textures too')
+    ap.add_argument('--redo', action='store_true',
+                    help='make again the pictures an earlier run made that nobody changed since (edited ones stay)')
     ap.add_argument('--psptex', type=Path, default=ROOT / 'build/windows-x64-release/psprecore/tools/psptex/psptex.exe')
     args = ap.parse_args()
 
@@ -79,6 +81,8 @@ def main():
         cmd += ['--limit', str(args.limit)]
     if args.with_2d:
         cmd.append('--2d')
+    if args.redo:
+        cmd.append('--redo')
     code = subprocess.run(cmd).returncode
     sheets = review(ROOT / 'assets/textures', ROOT / 'assets/textures-ai', tmp, ROOT / 'data/enhance-review')
     print('review sheets: %d in %s' % (sheets, ROOT / 'data/enhance-review'), file=sys.stderr)

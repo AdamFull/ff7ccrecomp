@@ -175,8 +175,11 @@ def main():
     ap.add_argument('--prompt', default=PROMPT, help='the instruction given with every picture')
     ap.add_argument('--prompt-file', type=Path, help='read the instruction from a file')
     ap.add_argument('--steps', type=int, default=4, help='sampling steps (the distilled model is made for 4)')
-    ap.add_argument('--prescale', default='lanczos', choices=['lanczos', 'bicubic', 'bilinear', 'nearest-exact', 'area'],
-                    help='how the picture is enlarged to the model\'s size before it edits it (default: lanczos)')
+    # Hard pixels work best: the model takes them for a low-resolution picture to redraw cleanly, where a smoothly
+    # enlarged one reads as a blurry photo (stair-steps turned into cracks, small details invented).
+    ap.add_argument('--prescale', default='nearest-exact',
+                    choices=['nearest-exact', 'lanczos', 'bicubic', 'bilinear', 'area'],
+                    help='how the picture is enlarged to the model\'s size before it edits it (default: nearest-exact)')
     ap.add_argument('--megapixels', type=float, default=1.0,
                     help='largest size the model works at (default 1.0; smaller pictures work at 4x, at least 0.25)')
     ap.add_argument('--seed', type=int, default=1, help='the same seed gives the same result for the same picture')
