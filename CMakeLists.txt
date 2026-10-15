@@ -22,14 +22,14 @@ if(PSPRECORE_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-# The game needs code generated from the user's own BOOT.BIN (psprecomp -> generated/); game/ holds hand-written
-# replacements for recompiled functions (GAME_FUNC; run psprecomp with --overrides game).
-set(FF7CC_GENERATED_DIR "${PROJECT_SOURCE_DIR}/generated" CACHE PATH "psprecomp output directory")
+# The game needs code generated from the user's own BOOT.BIN (psprecomp -> data/generated); src/decomp holds
+# hand-written replacements for recompiled functions (GAME_FUNC; run psprecomp with --overrides src/decomp).
+set(FF7CC_GENERATED_DIR "${PROJECT_SOURCE_DIR}/data/generated" CACHE PATH "psprecomp output directory")
 if(PSPRECORE_BUILD_GAME)
     file(GLOB _ff7cc_game_sources CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/src/*.cpp")
     psprecore_add_game(ff7cc
         GENERATED_DIR "${FF7CC_GENERATED_DIR}"
-        OVERRIDES_DIR "${PROJECT_SOURCE_DIR}/game"
+        OVERRIDES_DIR "${PROJECT_SOURCE_DIR}/src/decomp"
         SOURCES ${_ff7cc_game_sources})
     if(TARGET ff7cc)
         target_link_libraries(ff7cc PRIVATE ff7cc::game_formats)

@@ -1,7 +1,7 @@
 # Editing the game in C++
 
-Every function of BOOT.BIN is recompiled to C (`generated/`, see [recompiler.md](recompiler.md)). Any of them can
-be replaced by hand-written C++ in `game/`: the replacement is called wherever the game calls the original,
+Every function of BOOT.BIN is recompiled to C (`data/generated/`, see
+[recompiler.md](../psprecore/docs/recompiler.md)). Any of them can be replaced by hand-written C++ in `src/decomp/`: the replacement is called wherever the game calls the original,
 including through function pointers, and the recompiled original stays available.
 
 ## Writing a replacement
@@ -35,11 +35,11 @@ GAME_FUNC(08998F70, game_memcpy) {
 The generator has to know which functions are replaced, so that it renames them to `f_XXXXXXXX_orig`:
 
 ```
-psprecomp "<game>/PSP_GAME/SYSDIR/BOOT.BIN" generated --overrides game
+psprecomp data/original/PSP_GAME/SYSDIR/BOOT.BIN data/generated --overrides src/decomp
 ```
 
-Run it after adding or removing a `GAME_FUNC`. CMake checks this when configuring: if `generated/` does not know a
-replacement yet, it warns and builds without `game/` until the code is regenerated.
+Run it after adding or removing a `GAME_FUNC`. CMake checks this when configuring: if `data/generated/` does not know a
+replacement yet, it warns and builds without `src/decomp/` until the code is regenerated.
 
 ## Checking a replacement
 

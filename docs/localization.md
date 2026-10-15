@@ -7,7 +7,7 @@ only; the game never asks the system for a language.
 ## Exporting and translating
 
 ```
-cctext export "Crisis Core - Final Fantasy VII EU" text_en.po
+cctext export data/original text_en.po
 ```
 
 This writes a gettext PO file, which Poedit, Weblate, Lokalize and similar tools open directly. Each message has a
@@ -15,8 +15,8 @@ context `EEEEE.RR.MMM` (archive entry, resource, message) and the English text a
 into `msgstr`. Messages left empty or unchanged keep the original text.
 
 ```
-cctext build "Crisis Core - Final Fantasy VII EU" text_fr.po mods/french --language Français
-cctext verify "Crisis Core - Final Fantasy VII EU"     # round-trip check of every message
+cctext build data/original text_fr.po mods/french --language Français
+cctext verify data/original     # round-trip check of every message
 ```
 
 `build` rewrites only the modules whose text changed and writes them to `mods/french/pkg/NNNNN.atel`. With
@@ -51,9 +51,9 @@ A mod can draw up to 132 more characters into the free cells of the regular font
 Greek...):
 
 ```
-cctext font-export "Crisis Core - Final Fantasy VII EU" font.png      # the sheet: 13x14 cells, 19 to a row
+cctext font-export data/original font.png      # the sheet: 13x14 cells, 19 to a row
 # draw the new characters into free cells, with the sheet's own colours (copy them from existing glyphs)
-cctext font-import "Crisis Core - Final Fantasy VII EU" font.png mods/french
+cctext font-import data/original font.png mods/french
 ```
 
 `font-import` writes `mods/french/pkg/01472.bin` (the font file with the edited sheet; colours that are not in its

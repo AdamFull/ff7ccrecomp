@@ -1,5 +1,4 @@
 # --- Copyrighted / third-party inputs: never commit ---
-/Crisis Core - Final Fantasy VII EU/
 /PSP SDK/
 *.iso
 *.cso
@@ -13,14 +12,11 @@ PARAM.SFO
 *.at3
 *.pmf
 
-# --- Data derived from the user's game copy (generated locally) ---
-/game/
-/extracted/
-/cooked/
-/generated/
-/saves/
-/ff7cc.ini
-/vulkan_pipelines.bin*
+# --- The game copy and everything derived from it (data/: original, extracted, generated, cooked, recordings),
+# --- assets unpacked for editing (assets/), and the working directory for running the game (run/) ---
+/data/
+/assets/
+/run/
 
 # --- Build output ---
 /build/

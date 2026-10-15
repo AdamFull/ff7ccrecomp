@@ -8,9 +8,10 @@
 #   scripts\regress.ps1 -Update          # (re)write the references from the current build
 #   scripts\regress.ps1 -Dir D:\rec -Exe build\windows-x64-debug\ff7cc.exe
 param(
-    [string]$Dir = 'build\rec',
+    [string]$Dir = 'data\recordings',
     [string]$Exe = 'build\windows-x64-release\ff7cc.exe',
-    [string]$GameDir = 'Crisis Core - Final Fantasy VII EU',
+    [string]$GameDir = 'data\original',
+    [string]$CookedDir = 'data\cooked',  # movie frames reach the game's RAM: replays need the same cooked media
     [int]$Every = 500,   # vblanks between hashes
     [switch]$Update
 )
@@ -28,11 +29,11 @@ try {
     # One headless replay per recording, in parallel.
     $jobs = foreach ($r in $recordings) {
         $last = (Get-Content $r.FullName -Tail 1).Split(' ')[0]
-        Start-Job -ArgumentList $root, $Exe, $GameDir, $r.FullName, $last, $Every -ScriptBlock {
-            param($root, $exe, $game, $rec, $last, $every)
+        Start-Job -ArgumentList $root, $Exe, $GameDir, $CookedDir, $r.FullName, $last, $Every -ScriptBlock {
+            param($root, $exe, $game, $cooked, $rec, $last, $every)
             Set-Location $root
             $ErrorActionPreference = 'Continue'
-            $out = & $exe $game --headless --replay $rec --vblanks $last --state-hash $every 2>&1
+            $out = & $exe $game --headless --cooked $cooked --replay $rec --vblanks $last --state-hash $every 2>&1
             [pscustomobject]@{ Recording = $rec; Hashes = @($out | ForEach-Object { "$_" } | Where-Object { $_ -like 'state vblank*' }) }
         }
     }

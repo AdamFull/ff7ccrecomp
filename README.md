@@ -6,6 +6,25 @@ built by static recompilation and progressive decompilation.
 **This repository contains no game code or assets.** You need your own copy of the game
 (EU, ULES-01044). Everything derived from it is generated locally and never committed.
 
+## Layout
+
+```
+src/            the game's own code (main, mods, fonts, icon tables)
+src/decomp/     hand-written replacements of recompiled game functions (GAME_FUNC)
+libs/ tools/    the game's file formats and tools (ccpkg, ccatel, cctext, cccook)
+tests/ docs/ scripts/ cmake/ android/
+psprecore/      the recompiler and runtime (submodule)
+data/           your game copy and everything derived from it (git-ignored):
+  original/       the disc folder (PSP_GAME/...)
+  extracted/      the unpacked archive (ccpkg extract)
+  generated/      C code recompiled from BOOT.BIN (psprecomp)
+  cooked/         what the game loads besides the disc: audio, movies, textures
+  recordings/     play sessions for replays and regression tests
+assets/         game assets unpacked for editing, packed by the build (git-ignored)
+run/            the working directory for playing: settings, saves, mods, shader cache (git-ignored)
+build/          CMake output
+```
+
 The recompiler and runtime are [psprecore](https://github.com/AdamFull/psprecore), a git submodule in
 `psprecore/` (it brings [nx-foundation](https://github.com/AdamFull/nx-foundation) along); this repository adds
 what is specific to Crisis Core: its archive and script formats and tools, the game's own code (`src/`),
@@ -34,12 +53,12 @@ ctest --preset windows-x64-debug
 ```
 ccpkg info    <game>                    # summary by file type
 ccpkg list    <game>                    # index, sector, size, type for every file
-ccpkg extract <game> extracted/pkg      # files/NNNNN.<ext> + manifest.tsv
-ccpkg pack    extracted/pkg out/        # rebuild (files may be edited or resized)
+ccpkg extract <game> data/extracted/pkg # files/NNNNN.<ext> + manifest.tsv
+ccpkg pack    data/extracted/pkg out/   # rebuild (files may be edited or resized)
 ccpkg verify  <game> out/               # compare two archives file by file
 ```
 
-`<game>` can be the extracted disc root, `PSP_GAME`, `USRDIR`, or any folder with the two archive files.
+`<game>` can be the disc root (`data/original`), `PSP_GAME`, `USRDIR`, or any folder with the two archive files.
 
 `ccatel` works on the `Atel` script modules found inside the archive (`*.atel` after extraction):
 
@@ -49,31 +68,31 @@ ccatel strings file.atel                # decrypted name/string pool
 ccatel disasm  file.atel [out.txt]      # bytecode listing (labels, resolved names, native calls)
 ccatel unpack  file.atel dir/           # module.txt + names.bin + code.asm (editable listing) + res/
 ccatel pack    dir/ file.atel           # assemble code.asm and rebuild the module
-ccatel verify  extracted/pkg/files      # check every module rebuilds byte for byte
+ccatel verify  data/extracted/pkg/files # check every module rebuilds byte for byte
 ```
 
 `psprx` works on the game executable (`PSP_GAME/SYSDIR/BOOT.BIN`, an unencrypted PRX):
 
 ```
 psprx info    BOOT.BIN                  # module info, segments, imports/exports, relocation stats
-psprx nids    "PSP SDK/pspsdk-MINPSPW/psp/sdk/lib" build/nids.tsv   # NID names from local SDK stubs
-psprx imports BOOT.BIN build/nids.tsv   # all 197 imported system functions with names
+psprx nids    "PSP SDK/pspsdk-MINPSPW/psp/sdk/lib" data/nids.tsv   # NID names from local SDK stubs
+psprx imports BOOT.BIN data/nids.tsv   # all 197 imported system functions with names
 psprx image   BOOT.BIN 0x08804000 build/boot.bin   # relocated memory image (PPSSPP's load base)
 psprx disasm  BOOT.BIN                  # objdump-compatible listing (psprecore/scripts/check_allegrex.ps1 diffs it)
-psprx symbols BOOT.BIN build/nids.tsv build/symbols.tsv 0x08804000 build/ghidra_symbols.txt
+psprx symbols BOOT.BIN data/nids.tsv build/symbols.tsv 0x08804000 build/ghidra_symbols.txt
 ```
 
 `psprecomp` translates BOOT.BIN into C (see [psprecore/docs/recompiler.md](psprecore/docs/recompiler.md)); the output goes to the
-git-ignored `generated/` folder and is picked up by the build automatically:
+git-ignored `data/generated/` folder and is picked up by the build automatically:
 
 ```
-psprecomp "Crisis Core - Final Fantasy VII EU/PSP_GAME/SYSDIR/BOOT.BIN" generated --overrides game
+psprecomp data/original/PSP_GAME/SYSDIR/BOOT.BIN data/generated --overrides src/decomp
 ```
 
 `cctext` exports the game text to a PO file for translation and builds translated text into a mod folder;
 see [docs/localization.md](docs/localization.md).
 
-Game functions can be replaced by hand-written C++ in `game/` (`GAME_FUNC`); see
+Game functions can be replaced by hand-written C++ in `src/decomp/` (`GAME_FUNC`); see
 [docs/decompilation.md](docs/decompilation.md).
 
 `cccook` converts the game's music, voice clips, and movies into modern formats. The output is git-ignored,
@@ -82,27 +101,29 @@ like everything else derived from the game:
 - PSMF movies become AV1 (IVF) video plus Ogg Vorbis audio.
 
 It needs the FFmpeg command-line tool, at cook time only. Runs can be resumed. The game looks for `cooked/` in
-the working directory (or use `--cooked DIR`). Without it, music plays as silence and movies stay black.
+the working directory (or use `--cooked DIR`; `scripts\run.ps1` passes `data/cooked`). Without it, music plays as
+silence and movies stay black.
 
 ```
-cccook "Crisis Core - Final Fantasy VII EU" cooked
+cccook data/original data/cooked
 ```
 
 HD textures are baked offline, too (optional). Collect the textures while playing or replaying, then upscale them
-into `cooked/textures` with [Real-ESRGAN ncnn](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) (any 4x
+into `data/cooked/textures` with [Real-ESRGAN ncnn](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) (any 4x
 upscaler works through `--upscaler`). The "HD textures" setting switches them off and on in the game. Only scene
 textures are upscaled: the interface (menus, HUD, text) stays as it is unless a mod brings hand-drawn replacements
 (`mods/<mod>/textures/<hash>.png`, named by `--tex-dump`).
 
 ```
 ff7cc <game> --replay session.txt --unthrottled --tex-collect texlib    # or play normally; collections add up
-psptex bake texlib cooked --realesrgan path\to\realesrgan-ncnn-vulkan.exe --scale 4
+psptex bake texlib data/cooked --realesrgan path\to\realesrgan-ncnn-vulkan.exe --scale 4
 ```
 
 Running the game:
 
 ```
-ff7cc "Crisis Core - Final Fantasy VII EU"            # window: arrows/WASD, K/L/J/I = ×/○/□/△, Q/E, Enter/Backspace
+scripts\run.ps1                       # window: arrows/WASD, K/L/J/I = ×/○/□/△, Q/E, Enter/Backspace
+ff7cc data/original --cooked data/cooked                # the same by hand (settings, saves: working directory)
 ff7cc <game> --headless --vblanks 3600 --screenshot-every 300:shots/f --press 900:start   # automated runs
 ```
 
@@ -116,11 +137,12 @@ ff7cc <game> --headless --replay session.txt --state-hash 1000 --screenshot-ever
 A recording stores the guest clock it started with and snapshots the save folder (`session.txt.saves`), so a replay
 reproduces the run exactly, also across renderers (the game's RAM matches between the software and Vulkan
 renderers). After the replay ends, live input takes over.
-`scripts\regress.ps1` replays every recording in `build\rec` (with `NAME.state` references, written by `-Update`)
+`scripts\regress.ps1` replays every recording in `data\recordings` (with `NAME.state` references, written by `-Update`)
 and reports any difference in the game's RAM state.
 
-Android: `scripts/build-android.ps1 -Install` builds and installs the APK (arm64, NDK r29). Copy the extracted game
-folder and `cooked/` to `Android/data/com.ff7ccrecomp/files/` on the device (for example with `adb push`). Logs go
+Android: `scripts/build-android.ps1 -Install` builds and installs the APK (arm64, NDK r29). `-InstallData` copies
+the game (`data/original`, as `Crisis Core - Final Fantasy VII EU/`) and `data/cooked` to
+`Android/data/com.ff7ccrecomp/files/` on the device. Logs go
 to logcat (tag `ff7cc`) and `ff7cc.log` in the same folder; test options can be passed with
 `adb shell am start -n com.ff7ccrecomp/.GameActivity -e args "--perf"`.
 

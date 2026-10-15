@@ -18,13 +18,13 @@
 # -Install to put the app back).
 #
 # Needs: Android SDK (ANDROID_HOME) with NDK 29.0.14206865, JDK 17+, the Vulkan SDK (VULKAN_SDK: slangc, volk, VMA),
-# and generated/ from psprecomp. CMake/Ninja are taken from Visual Studio when not on PATH.
+# and data\generated from psprecomp. CMake/Ninja are taken from Visual Studio when not on PATH.
 param(
     [switch]$Install,
     [switch]$InstallData,
     [string]$Device,        # adb serial, or a model name such as Pixel_10_Pro (as adb devices -l prints it)
-    [string]$GameDir,       # default: "<repo>\Crisis Core - Final Fantasy VII EU"
-    [string]$CookedDir,     # default: "<repo>\cooked"
+    [string]$GameDir,       # default: "<repo>\data\original"
+    [string]$CookedDir,     # default: "<repo>\data\cooked"
     [switch]$ResetAppData,  # uninstall first (deletes the app's files and saves on the device)
     [switch]$SkipBuild,     # install the APK built last time
     [switch]$ListDevices,
@@ -34,9 +34,9 @@ $ErrorActionPreference = 'Continue'  # native tools write warnings to stderr; ex
 $root = Split-Path -Parent $PSScriptRoot
 $package = 'com.ff7ccrecomp'
 $remoteFiles = "/sdcard/Android/data/$package/files"
-$gameName = 'Crisis Core - Final Fantasy VII EU'  # the folder name the app looks for
-if (-not $GameDir) { $GameDir = Join-Path $root $gameName }
-if (-not $CookedDir) { $CookedDir = Join-Path $root 'cooked' }
+$gameName = 'Crisis Core - Final Fantasy VII EU'  # the folder name the app looks for (on the device)
+if (-not $GameDir) { $GameDir = Join-Path $root 'data\original' }
+if (-not $CookedDir) { $CookedDir = Join-Path $root 'data\cooked' }
 
 if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk" }
 $adb = Join-Path $env:ANDROID_HOME 'platform-tools\adb.exe'
