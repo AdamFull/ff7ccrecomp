@@ -54,6 +54,9 @@ rt::gpu::UiFont ui_font() {
     font.buffer_width = 256;
     font.swizzled = true;
     font.palette_format = 3;
+    // Glyph rows 0-4 (the first 64 texel rows): mods add characters further down (ff7cc/formats/font.hpp).
+    font.check_hash = 0x1C4BF5FAF1B8767Cull;
+    font.check_bytes = 8192;
     return font;
 }
 
