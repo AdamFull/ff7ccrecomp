@@ -39,6 +39,8 @@ VERIFIED = {
     '00002.bin/000090_45429CFA1503C2B8.png': 'ui_upscale/square_logo.png',
     '00002.bin/000090_C288E7A025EA2C95.png': 'ui_upscale/square_logo.png',
     '00002.bin/000090_C9D5F7865B213820.png': 'ui_upscale/square_logo.png',
+    # Save / load screen artwork (an upscale outside their interface folder matches it more closely)
+    '01465.bin/051280_43E13C4971419BEA.png': 'ui_upscale/save.png',
     # DMW reel digits 1-7 (32x32; their N.png are 4x, N_big.png belong to a larger set)
     '01470.bin/0000C0_919F533A2496018D.png': 'ui_upscale/1.png',
     '01470.bin/0008E0_9F9D7D78D0A82AF8.png': 'ui_upscale/2.png',
