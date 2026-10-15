@@ -90,7 +90,9 @@ cccook "Crisis Core - Final Fantasy VII EU" cooked
 
 HD textures are baked offline, too (optional). Collect the textures while playing or replaying, then upscale them
 into `cooked/textures` with [Real-ESRGAN ncnn](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) (any 4x
-upscaler works through `--upscaler`). The "HD textures" setting switches them off and on in the game.
+upscaler works through `--upscaler`). The "HD textures" setting switches them off and on in the game. Only scene
+textures are upscaled: the interface (menus, HUD, text) stays as it is unless a mod brings hand-drawn replacements
+(`mods/<mod>/textures/<hash>.png`, named by `--tex-dump`).
 
 ```
 ff7cc <game> --replay session.txt --unthrottled --tex-collect texlib    # or play normally; collections add up
