@@ -112,10 +112,20 @@ def main():
     print(len(picked), 'hand-made pictures in the pack', file=sys.stderr)
     subprocess.run([str(args.psptex), 'match', str(args.pack), str(ROOT / 'assets/textures'), str(out),
                     '--only', str(only)], check=True)
+    # The verified pictures, listed in verified.txt; ones an earlier run placed and no longer verified go.
+    listed = out / 'verified.txt'
+    before = set(listed.read_text(encoding='utf-8').split()) if listed.exists() else set()
+    placed = []
     for ours, theirs in VERIFIED.items():
         if (ROOT / 'assets/textures' / ours).exists() and (args.pack / theirs).exists():
             (out / ours).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(args.pack / theirs, out / ours)
+            placed.append(ours)
+    matched = {line.split('\t')[0] for line in (out / 'matched.tsv').read_text(encoding='utf-8').splitlines()
+               if line and not line.startswith('#')}
+    for ours in before - set(placed) - matched:
+        (out / ours).unlink(missing_ok=True)
+    listed.write_text('\n'.join(placed) + '\n', encoding='utf-8')
     readme = args.pack / 'ui_upscale/Crisis Core UI Upscale Readme.txt'
     if readme.exists():  # their credits travel with the pictures
         shutil.copyfile(readme, out / 'FF7CCUP UI readme (credits).txt')
