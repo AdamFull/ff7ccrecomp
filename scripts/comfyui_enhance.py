@@ -31,9 +31,9 @@ NODES = ['UNETLoader', 'CLIPLoader', 'VAELoader', 'LoadImage', 'ImageScaleToTota
          'EmptyFlux2LatentImage', 'Flux2Scheduler', 'CLIPTextEncode', 'ConditioningZeroOut', 'VAEEncode',
          'ReferenceLatent', 'CFGGuider', 'RandomNoise', 'KSamplerSelect', 'SamplerCustomAdvanced', 'VAEDecode',
          'SaveImage']
-PROMPT = ('Enhance this video game texture: make it sharp, clean and highly detailed, as if painted at a much higher '
-          'resolution. Remove blur, noise and compression artifacts. Keep exactly the same layout, shapes, positions, '
-          'proportions, colours and lighting; do not add, remove or move anything.')
+PROMPT = ('Upscale this video game texture to 4x resolution and enhance it: sharp, clean and highly detailed, as if '
+          'painted at the higher resolution. Remove blur, pixelation, noise and compression artifacts. Keep exactly '
+          'the same layout, shapes, positions, proportions, colours and lighting; do not add, remove or move anything.')
 
 
 def request(url, data=None, headers=None):
@@ -122,7 +122,7 @@ def graph(image, prompt, seed, megapixels, args):
         'vae': {'class_type': 'VAELoader', 'inputs': {'vae_name': args.vae}},
         'load': {'class_type': 'LoadImage', 'inputs': {'image': image}},
         'scale': {'class_type': 'ImageScaleToTotalPixels',
-                  'inputs': {'image': ['load', 0], 'upscale_method': 'lanczos', 'megapixels': megapixels,
+                  'inputs': {'image': ['load', 0], 'upscale_method': args.prescale, 'megapixels': megapixels,
                              'resolution_steps': 16}},
         'size': {'class_type': 'GetImageSize', 'inputs': {'image': ['scale', 0]}},
         'latent': {'class_type': 'EmptyFlux2LatentImage',
@@ -175,6 +175,8 @@ def main():
     ap.add_argument('--prompt', default=PROMPT, help='the instruction given with every picture')
     ap.add_argument('--prompt-file', type=Path, help='read the instruction from a file')
     ap.add_argument('--steps', type=int, default=4, help='sampling steps (the distilled model is made for 4)')
+    ap.add_argument('--prescale', default='lanczos', choices=['lanczos', 'bicubic', 'bilinear', 'nearest-exact', 'area'],
+                    help='how the picture is enlarged to the model\'s size before it edits it (default: lanczos)')
     ap.add_argument('--megapixels', type=float, default=1.0,
                     help='largest size the model works at (default 1.0; smaller pictures work at 4x, at least 0.25)')
     ap.add_argument('--seed', type=int, default=1, help='the same seed gives the same result for the same picture')
