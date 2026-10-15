@@ -23,10 +23,10 @@ constexpr std::uint64_t kUnskippableMovies[] = {0x001A60EC489C619Dull};
 
 namespace {
 
-void mount(nx::string_view mods_dir) {
+void mount(std::span<const nx::string> mods) {
     install_archive();
-    set_mods(mods_dir);
-    collect_mod_glyphs(mods_dir);
+    set_mods(mods);
+    collect_mod_glyphs(mods);
 }
 
 constexpr platform::GameInfo kGame{

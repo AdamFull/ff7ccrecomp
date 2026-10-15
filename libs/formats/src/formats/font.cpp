@@ -92,6 +92,7 @@ void swizzle4(std::span<const std::uint8_t> indices, int width, int height, std:
 
 nx::vector<ExtraGlyph> parse_glyphs(nx::string_view text) {
     nx::vector<ExtraGlyph> out;
+    if (text.starts_with("\xEF\xBB\xBF")) text.remove_prefix(3);  // a UTF-8 BOM
     int line_number = 0;
     while (!text.empty()) {
         const std::size_t end = text.find('\n');

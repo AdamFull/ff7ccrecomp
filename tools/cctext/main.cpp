@@ -1,7 +1,10 @@
 // cctext — the game's dialogue and menu text (MBD tables in Atel modules) as gettext PO files.
 //
 //   cctext export <game> <out.po>             every message; msgctxt "EEEEE.RR.MMM" = entry, resource, message
-//   cctext build  <game> <in.po> <mod dir>    modules whose translated text differs -> <mod dir>/pkg/EEEEE.atel
+//   cctext build  <game> <in.po> <mod dir> [--language NAME]
+//                                              modules whose translated text differs -> <mod dir>/pkg/EEEEE.atel;
+//                                              with --language, a language pack (<mod dir>/mod.ini) chosen in the
+//                                              pause menu
 //   cctext verify <game>                      binary and text round trips of every message
 //   cctext font-export <game> <out.png>       the regular font's sheet as a picture to draw new characters in
 //   cctext font-import <game> <in.png> <mod dir>  the edited sheet -> <mod dir>/pkg/01472.bin
@@ -288,7 +291,7 @@ int font_import(nx::fs::path_view game, const nx::string& png, nx::fs::path_view
     return 0;
 }
 
-int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view mod_dir) {
+int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view mod_dir, const nx::string& language) {
     const auto charset = mod_charset(mod_dir);
     nx::map<Key, nx::string> translated;
     for (const auto& e : read_po(po_path)) {
@@ -334,13 +337,19 @@ int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view m
     }
     std::fprintf(stderr, "%zu messages changed in %zu modules -> %s (%zu errors)\n", changed, modules,
                  pkg_dir.c_str(), errors);
+    if (!language.empty()) {  // a language pack (psprecore/platform/mods.hpp)
+        const nx::string ini = path_join(mod_dir.native(), "mod.ini");
+        if (!nx::fs::file_write_text(ini, nx::format("name={} translation\nlanguage={}\n", language, language)).has_value())
+            throw IoError("cannot write '" + ini + "'");
+        std::fprintf(stderr, "language pack: %s (%s)\n", language.c_str(), ini.c_str());
+    }
     return errors ? 1 : 0;
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
-    nx::string game, po, mod_dir;
+    nx::string game, po, mod_dir, language;
     nx::cli::Parser cli("cctext", "The game's dialogue and menu text as gettext PO files (see docs/localization.md).");
     cli.command("export", "every message; msgctxt \"EEEEE.RR.MMM\" = entry, resource, message")
         .positional("game", game, "the game")
@@ -348,7 +357,8 @@ int main(int argc, char** argv) {
     cli.command("build", "modules whose translated text differs -> <mod dir>/pkg/EEEEE.atel")
         .positional("game", game, "the game")
         .positional("po", po, "translated PO file")
-        .positional("mod-dir", mod_dir, "mod folder to write");
+        .positional("mod-dir", mod_dir, "mod folder to write")
+        .option("language", language, "make the mod a language pack with this name (chosen in the pause menu)");
     cli.command("verify", "binary and text round trips of every message").positional("game", game, "the game");
     nx::string png;
     cli.command("font-export", "the regular font's sheet as a picture to draw new characters in")
@@ -362,7 +372,7 @@ int main(int argc, char** argv) {
     if (const int code = parse_command_line(cli, argc, argv, &command); code >= 0) return code;
     try {
         if (command == "export") return export_po(game, po);
-        if (command == "build") return build(game, po, mod_dir);
+        if (command == "build") return build(game, po, mod_dir, language);
         if (command == "verify") return verify(game);
         if (command == "font-export") return font_export(game, png);
         if (command == "font-import") return font_import(game, png, mod_dir);

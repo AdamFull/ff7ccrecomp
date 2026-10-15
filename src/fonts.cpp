@@ -26,15 +26,9 @@ nx::map<int, int> g_advances;  // glyph index -> advance, from the mods (a later
 
 }  // namespace
 
-void collect_mod_glyphs(nx::string_view mods_dir) {
+void collect_mod_glyphs(std::span<const nx::string> mods) {
     g_advances.clear();
-    auto mods = nx::fs::directory_entries(nx::string(mods_dir));
-    if (!mods.has_value()) return;
-    nx::vector<nx::string> folders;
-    for (const auto& e : mods.value())
-        if (e.type == nx::fs::file_type::directory) folders.push_back(e.path);
-    std::sort(folders.begin(), folders.end());
-    for (const auto& folder : folders) {
+    for (const auto& folder : mods) {
         const nx::string path = path_join(folder, "font/glyphs.txt");
         if (!is_file(path)) continue;
         const auto text = nx::fs::file_read_text(path);

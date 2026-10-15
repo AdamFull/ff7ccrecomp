@@ -59,16 +59,13 @@ public:
 
 void install_archive() { rt::map_disc_file(kPkg, kPkgLbn); }
 
-void set_mods(nx::string_view mods_dir) {
+void set_mods(std::span<const nx::string> mods) {
     rt::set_disc_overlay(nullptr);
-    if (!is_directory(mods_dir)) return;
-    nx::vector<nx::string> mods;
-    if (auto list = nx::fs::directory_entries(mods_dir); list.has_value())
-        for (const auto& d : list.value())
-            if (d.type == nx::fs::file_type::directory && is_directory(path_join(d.path, "pkg"))) mods.push_back(d.path);
-    std::sort(mods.begin(), mods.end());
     nx::map<std::size_t, nx::string> replaced;  // entry -> file (later mods win)
+    std::size_t folders = 0;
     for (const auto& m : mods) {
+        if (!is_directory(path_join(m, "pkg"))) continue;
+        ++folders;
         auto files = nx::fs::directory_entries(path_join(m, "pkg"));
         if (!files.has_value()) continue;
         for (const auto& f : files.value()) {
@@ -105,8 +102,7 @@ void set_mods(nx::string_view mods_dir) {
     }
     const auto patched = pkg::serialize_index(entries);
     overlay->fse.assign(reinterpret_cast<const char*>(patched.data()), reinterpret_cast<const char*>(patched.data()) + patched.size());
-    std::fprintf(stderr, "mods: %zu archive entries replaced from %zu mod folders in %s\n", replaced.size(), mods.size(),
-                 nx::string(mods_dir).c_str());
+    std::fprintf(stderr, "mods: %zu archive entries replaced from %zu mod folders\n", replaced.size(), folders);
     rt::set_disc_overlay(std::move(overlay));
 }
 

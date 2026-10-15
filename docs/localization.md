@@ -15,11 +15,14 @@ context `EEEEE.RR.MMM` (archive entry, resource, message) and the English text a
 into `msgstr`. Messages left empty or unchanged keep the original text.
 
 ```
-cctext build "Crisis Core - Final Fantasy VII EU" text_fr.po mods/french
+cctext build "Crisis Core - Final Fantasy VII EU" text_fr.po mods/french --language Français
 cctext verify "Crisis Core - Final Fantasy VII EU"     # round-trip check of every message
 ```
 
-`build` rewrites only the modules whose text changed and writes them to `mods/french/pkg/NNNNN.atel`.
+`build` rewrites only the modules whose text changed and writes them to `mods/french/pkg/NNNNN.atel`. With
+`--language` the mod becomes a language pack (it writes `mods/french/mod.ini` with `language=Français`): installed
+packs are listed under "Language" in the pause menu, only the chosen one applies ("Original" keeps the game's
+text), and the choice takes effect the next time the game starts. Mods without a language always apply.
 
 Scripts address messages by byte offset inside their table (for example `Mes(2128, 18, ...)` shows the message at
 offset 2128 of resource 18), and some resources by their offset in the module. So `build` never moves anything: a
@@ -75,7 +78,10 @@ At startup the game reads mod folders from `mods/` next to the settings (`--mods
 ```
 mods/
   french/
+    mod.ini             name=..., language=Français (optional; a language pack)
     pkg/01954.atel      replaces archive entry 1954
+    pkg/01472.bin       the font with added characters (cctext font-import)
+    font/glyphs.txt     the added characters
     textures/DEA7A4783C669CE6_zack.png      replaces a texture (Vulkan renderer)
 ```
 
