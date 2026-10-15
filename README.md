@@ -175,6 +175,11 @@ reference, switched when the menu closes), internal resolution, anti-aliasing (M
 working directory. Saves go to `saves/`; the game's save and load screens open a slot picker. Mods can replace
 archive entries, text and textures (docs/localization.md).
 
+Also in the pause menu: "HD textures" (the replacements in `data/cooked/textures`), "Smooth motion" (a frame drawn
+between each two of the game's, for 60 fps) and "Fill the screen": on a screen of another shape than the PSP's
+(wider, like 21:9, or taller, like 4:3), the 3D scene fills it and the battle and field HUD moves to its edges;
+movies and menus stay in the PSP's proportions.
+
 Movies can be skipped: pressing any button during one shows a "Hold to skip" prompt, and holding Circle (B on Xbox,
 A on Nintendo, L on the keyboard; on a touch screen, a finger on the picture) for under a second skips it: the
 game runs through the rest of the movie without picture and sound in a second or two, so what follows plays as
