@@ -82,10 +82,19 @@ like everything else derived from the game:
 - PSMF movies become AV1 (IVF) video plus Ogg Vorbis audio.
 
 It needs the FFmpeg command-line tool, at cook time only. Runs can be resumed. The game looks for `cooked/` in
-the working directory (or use `--cooked DIR`). Without it, music and movie audio play as silence.
+the working directory (or use `--cooked DIR`). Without it, music plays as silence and movies stay black.
 
 ```
 cccook "Crisis Core - Final Fantasy VII EU" cooked
+```
+
+HD textures are baked offline, too (optional). Collect the textures while playing or replaying, then upscale them
+into `cooked/textures` with [Real-ESRGAN ncnn](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) (any 4x
+upscaler works through `--upscaler`). The "HD textures" setting switches them off and on in the game.
+
+```
+ff7cc <game> --replay session.txt --unthrottled --tex-collect texlib    # or play normally; collections add up
+psptex bake texlib cooked --realesrgan path\to\realesrgan-ncnn-vulkan.exe --scale 4
 ```
 
 Running the game:
