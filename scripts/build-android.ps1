@@ -104,8 +104,19 @@ function Copy-GameData {
     if (Test-Path $CookedDir) {
         Write-Host "Copying cooked media to $remoteFiles/cooked..."
         Invoke-Adb shell "mkdir -p '$remoteFiles/cooked'"
-        Get-ChildItem $CookedDir -Directory | Where-Object { $_.Name -ne 'tmp' } | ForEach-Object {
+        Get-ChildItem $CookedDir -Directory | Where-Object { $_.Name -notin 'tmp', 'textures-tmp', 'textures' } | ForEach-Object {
             Invoke-Adb push --sync $_.FullName "$remoteFiles/cooked/"
+        }
+        # Baked HD textures: phones sample ASTC, so only those files go (hard links in a staging folder).
+        $textures = Join-Path $CookedDir 'textures'
+        if (Test-Path $textures) {
+            $stage = Join-Path $root 'build\android-stage\textures'
+            if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
+            New-Item -ItemType Directory -Force $stage | Out-Null
+            Get-ChildItem $textures -Filter '*.astc.ktx2' | ForEach-Object {
+                New-Item -ItemType HardLink -Path (Join-Path $stage $_.Name) -Target $_.FullName | Out-Null
+            }
+            Invoke-Adb push --sync $stage "$remoteFiles/cooked/"
         }
     } else {
         Write-Warning "No cooked media at $CookedDir (run cccook); music and movies will be silent or black."
