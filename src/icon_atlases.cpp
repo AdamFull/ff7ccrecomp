@@ -1,6 +1,6 @@
 // The game's textures with PlayStation button icons (psprecore/gpu/button_icons.hpp) and its text font
 // (psprecore/gpu/ui_font.hpp): positions, cell layout and texel hashes only. Find more with --tex-dump VBLANK:DIR
-// (files are named by the hash used here).
+// (the last hash in its file names is the one used here).
 
 #include <span>
 

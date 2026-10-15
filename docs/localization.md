@@ -51,8 +51,19 @@ At startup the game reads mod folders from `mods/` next to the settings (`--mods
 mods/
   french/
     pkg/01954.atel      replaces archive entry 1954
+    textures/DEA7A4783C669CE6_zack.png      replaces a texture (Vulkan renderer)
 ```
 
 Folders apply in name order; a later folder wins when two replace the same entry. Nothing on the disc is modified:
 the game is given a patched `discimg.fse` over a virtual archive in which every entry keeps its original order
 (entries after a resized one move). On Android the folder is `Android/data/com.ff7ccrecomp/files/mods/`.
+
+### Textures
+
+A PNG in `textures/` replaces the game texture whose content hash starts its name (16 hex digits; anything may
+follow). `--tex-dump VBLANK:DIR` writes the textures drawn at that moment under exactly such names, so a dumped file
+can be edited and dropped into a mod as it is. The picture may be any size up to 2048x2048: drawn at 2x or 4x the
+original it simply looks sharper. Palette textures drawn in several colours have one hash per palette.
+
+Without mods, "Upscale textures (2x)" in the pause menu enlarges the game's 3D textures when they are loaded, with
+an edge-directed filter that keeps diagonal edges smooth; textures used for the 2D interface keep their pixels.
