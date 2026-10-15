@@ -101,6 +101,3 @@ For palette textures (the font, much of the interface) an index map is usually b
 Put an enlarged, redrawn map into `mods/<mod>/textures/indexed/` (same grey levels only, no smoothing between them)
 and the game colours it with whatever palette it uses at the moment, so one HD font serves white, yellow and grey
 text alike.
-
-Without mods, "Upscale textures (2x)" in the pause menu enlarges the game's 3D textures when they are loaded, with
-an edge-directed filter that keeps diagonal edges smooth; textures used for the 2D interface keep their pixels.
