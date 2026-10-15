@@ -96,5 +96,11 @@ follow). `--tex-dump VBLANK:DIR` writes the textures drawn at that moment under 
 can be edited and dropped into a mod as it is. The picture may be any size up to 2048x2048: drawn at 2x or 4x the
 original it simply looks sharper. Palette textures drawn in several colours have one hash per palette.
 
+For palette textures (the font, much of the interface) an index map is usually better: `--tex-dump` also writes
+`indexed/<hash>_....png`, a grey picture whose brightness is each texel's palette index (index x 17 for 16 colours).
+Put an enlarged, redrawn map into `mods/<mod>/textures/indexed/` (same grey levels only, no smoothing between them)
+and the game colours it with whatever palette it uses at the moment, so one HD font serves white, yellow and grey
+text alike.
+
 Without mods, "Upscale textures (2x)" in the pause menu enlarges the game's 3D textures when they are loaded, with
 an edge-directed filter that keeps diagonal edges smooth; textures used for the 2D interface keep their pixels.
