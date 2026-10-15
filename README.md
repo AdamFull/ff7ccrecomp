@@ -135,6 +135,11 @@ psptex match data/third-party/<pack> assets/textures assets/textures-hd
 Only textures already unpacked into `assets/textures` can be matched; collecting more scenes (step 1) widens it.
 Third-party packs keep their own terms: they stay in the git-ignored `data/` and `assets/`, never in the repository.
 
+`scripts/import_ff7ccup.py` does this for [FF7CCUP](https://github.com/eqprog/FF7CCUP) (cloned into
+`data/third-party/FF7CCUP`), taking only its hand-made work: the interface Kaosu Reido redrew, and the scene textures
+its history shows were edited by hand (its other scene textures are neural-network upscales). Its credits are copied
+next to the pictures.
+
 `psptex bake` can also upscale a collection's scene textures with a neural upscaler (Real-ESRGAN ncnn); the
 results are mixed, so hand-edited textures are the main path.
 
