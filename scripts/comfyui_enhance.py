@@ -194,9 +194,21 @@ def main():
     ap.add_argument('--server', help='use a running ComfyUI (e.g. http://127.0.0.1:8000) instead of starting one')
     ap.add_argument('--port', type=int, default=8189, help='port of the server it starts (default 8189)')
     ap.add_argument('--info', action='store_true', help='print the installed nodes\' parameters and exit')
+    ap.add_argument('--cooldown', type=float, default=0.0,
+                    help='seconds to wait after each picture (a laptop without much cooling: the GPU rests)')
     args = ap.parse_args()
     if args.prompt_file:
         args.prompt = args.prompt_file.read_text(encoding='utf-8').strip()
+
+    # Pictures with a result already (an interrupted run continued: psptex enhance --resume) are not made again.
+    pictures = []
+    if args.input and args.output and not args.info:
+        pictures = [p for p in sorted(args.input.glob('*.png')) if not (args.output / p.name).exists()]
+        done = len(list(args.input.glob('*.png'))) - len(pictures)
+        if done:
+            print('%d pictures already have a result' % done, file=sys.stderr, flush=True)
+        if not pictures:
+            return
 
     from PIL import Image  # (ComfyUI's Python has Pillow; so does any Python with the analysis tools)
 
@@ -212,7 +224,6 @@ def main():
             if not args.input or not args.output:
                 ap.error('input and output folders are needed')
             args.output.mkdir(parents=True, exist_ok=True)
-            pictures = sorted(args.input.glob('*.png'))
             start = time.time()
             failed = 0
             for i, path in enumerate(pictures, 1):
@@ -236,6 +247,8 @@ def main():
                 eta = (time.time() - start) / i * (len(pictures) - i)
                 print('%d/%d %s (%dx%d -> %dx), %.0f s left' % (i, len(pictures), path.name, w, h, k, eta),
                       file=sys.stderr, flush=True)
+                if args.cooldown > 0:
+                    time.sleep(args.cooldown)
             if failed:
                 sys.exit('%d of %d pictures failed' % (failed, len(pictures)))
         finally:

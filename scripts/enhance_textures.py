@@ -9,6 +9,11 @@ characters, and the character / monster / weapon models, are made by hand (owner
     python scripts/enhance_textures.py --limit 20       # try a few first
     python scripts/enhance_textures.py                  # all the rest (about 5 s a texture on an 8 GB GPU)
     python scripts/enhance_textures.py --prompt-file my_prompt.txt
+    python scripts/enhance_textures.py --cooldown 3     # a hot laptop: the GPU rests 3 s after each picture
+
+A run can be stopped at any time and continues where it stopped when started again with the same options (what the
+model made is kept in data/enhance-tmp; --fresh starts over). Results reach assets/textures-ai when a run completes:
+for a short session, --limit N finishes after N pictures (those done before included).
 
 Pictures already in assets/textures-ai are never replaced (delete one to have it made again; edit one and it stays
 yours). Each run writes review sheets (original | model | result) to data/enhance-review/ to spot bad ones.
@@ -76,6 +81,8 @@ def main():
     ap.add_argument('--2d', dest='with_2d', action='store_true', help='interface textures too')
     ap.add_argument('--redo', action='store_true',
                     help='make again the pictures an earlier run made that nobody changed since (edited ones stay)')
+    ap.add_argument('--cooldown', type=float, default=0.0, help='seconds the GPU rests after each picture')
+    ap.add_argument('--fresh', action='store_true', help='start over instead of continuing an interrupted run')
     ap.add_argument('--psptex', type=Path, default=ROOT / 'build/windows-x64-release/psprecore/tools/psptex/psptex.exe')
     args = ap.parse_args()
 
@@ -83,6 +90,8 @@ def main():
     upscaler = '"%s" "%s" "{in}" "{out}"' % (sys.executable, ROOT / 'scripts/comfyui_enhance.py')
     if args.prompt_file:
         upscaler += ' --prompt-file "%s"' % args.prompt_file.resolve()
+    if args.cooldown:
+        upscaler += ' --cooldown %g' % args.cooldown
     cmd = [str(args.psptex), 'enhance', str(ROOT / 'assets/textures'), str(ROOT / 'assets/textures-ai'),
            '--skip-layer', str(ROOT / 'assets/textures-hd'), '--upscaler', upscaler, '--detail', str(args.detail),
            '--strength', str(args.strength),
@@ -97,6 +106,8 @@ def main():
         cmd.append('--2d')
     if args.redo:
         cmd.append('--redo')
+    if not args.fresh:
+        cmd.append('--resume')
     code = subprocess.run(cmd).returncode
     sheets = review(ROOT / 'assets/textures', ROOT / 'assets/textures-ai', tmp, ROOT / 'data/enhance-review')
     print('review sheets: %d in %s' % (sheets, ROOT / 'data/enhance-review'), file=sys.stderr)
