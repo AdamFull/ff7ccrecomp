@@ -108,7 +108,8 @@ function Update-Textures {
         if (-not (Test-Path $psptex)) { throw "psptex was not built ($psptex)" }
     }
     Write-Host 'Packing edited textures (assets/textures, textures-hd, textures-ai -> cooked/textures)...'
-    & $psptex pack $assets $CookedDir --layer (Join-Path $root 'assets\textures-hd') --layer (Join-Path $root 'assets\textures-ai')
+    & $psptex pack $assets $CookedDir --layer (Join-Path $root 'assets\textures-hd') --layer (Join-Path $root 'assets\textures-ai') `
+        --originals (Join-Path $root 'data\collected-textures')
     if ($LASTEXITCODE) { throw 'psptex pack failed' }
 }
 

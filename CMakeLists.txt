@@ -29,6 +29,7 @@ if(PSPRECORE_BUILD_TOOLS)
             COMMAND psptex pack "${_ff7cc_textures}" "${FF7CC_COOKED_DIR}"
                     --layer "${PROJECT_SOURCE_DIR}/assets/textures-hd"
                     --layer "${PROJECT_SOURCE_DIR}/assets/textures-ai"
+                    --originals "${PROJECT_SOURCE_DIR}/data/collected-textures"
             DEPENDS psptex
             COMMENT "Packing edited textures (assets/textures, textures-hd, textures-ai -> cooked/textures)"
             VERBATIM)
