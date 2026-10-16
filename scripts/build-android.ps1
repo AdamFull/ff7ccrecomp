@@ -7,6 +7,8 @@
 #   scripts\build-android.ps1 -InstallData            # only copies the data (no build); the app must be installed
 #   scripts\build-android.ps1 -Install -Device Pixel_10_Pro   # pick the device: adb serial or model (adb devices -l)
 #   scripts\build-android.ps1 -ListDevices            # shows the connected devices and exits
+#   scripts\build-android.ps1 -Driver turnip.zip      # copies a custom GPU driver package (Adreno; installed by the
+#                                                     # app at its next start, then chosen in the pause menu)
 #   scripts\build-android.ps1 -Install -Smoke         # ... then starts the app silently for 2 seconds of game time
 #                                                     # and checks that it got there (library loads, game boots)
 #
@@ -29,7 +31,8 @@ param(
     [switch]$ResetAppData,  # uninstall first (deletes the app's files and saves on the device)
     [switch]$SkipBuild,     # install the APK built last time
     [switch]$ListDevices,
-    [switch]$Smoke          # launch test after installing (no sound; needs the game data on the device)
+    [switch]$Smoke,         # launch test after installing (no sound; needs the game data on the device)
+    [string]$Driver         # a custom GPU driver package (.zip with meta.json) to copy to the device
 )
 $ErrorActionPreference = 'Continue'  # native tools write warnings to stderr; exit codes are checked
 $root = Split-Path -Parent $PSScriptRoot
@@ -170,8 +173,8 @@ if ($ListDevices) {
     return
 }
 if ($ResetAppData -and -not $Install) { throw '-ResetAppData uninstalls the app; it needs -Install to put it back.' }
-$script:target = if ($Install -or $InstallData -or $Smoke) { Select-Device } else { $null }  # before the long build: fail fast
-$build = -not $SkipBuild -and ($Install -or -not $InstallData)
+$script:target = if ($Install -or $InstallData -or $Smoke -or $Driver) { Select-Device } else { $null }  # before the long build: fail fast
+$build = -not $SkipBuild -and ($Install -or -not ($InstallData -or $Driver))
 
 if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
@@ -194,6 +197,8 @@ try {
         $jni = Join-Path $root 'build\android-arm64-release\jniLibs\arm64-v8a'
         New-Item -ItemType Directory -Force $jni | Out-Null
         Copy-Item (Join-Path $root 'build\android-arm64-release\libmain.so') $jni -Force
+        # libadrenotools' hook libraries (custom GPU drivers), loaded at run time from the app's library folder.
+        Get-ChildItem (Join-Path $root 'build\android-arm64-release') -Filter 'lib*hook*.so' | Copy-Item -Destination $jni -Force
 
         Push-Location (Join-Path $root 'android')
         try {
@@ -212,6 +217,13 @@ try {
         Invoke-Adb install -r $apk
     }
     if ($InstallData) { Copy-GameData }
+    if ($Driver) {
+        if (-not (Test-Path $Driver)) { throw "No driver package at $Driver" }
+        Initialize-AppFolder
+        Invoke-Adb shell "mkdir -p '$remoteFiles/gpu_drivers'"
+        Invoke-Adb push (Resolve-Path $Driver).Path "$remoteFiles/gpu_drivers/"
+        Write-Host "Driver package copied; the app installs it at its next start (pause menu: GPU driver)."
+    }
     if ($Smoke) {
         # The app writes its log to files/ff7cc.log; a library that fails to load never gets there.
         $log = "$remoteFiles/ff7cc.log"

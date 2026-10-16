@@ -184,6 +184,13 @@ the game (`data/original`, as `Crisis Core - Final Fantasy VII EU/`) and `data/c
 to logcat (tag `ff7cc`) and `ff7cc.log` in the same folder; test options can be passed with
 `adb shell am start -n com.ff7ccrecomp/.GameActivity -e args "--perf"`.
 
+Custom GPU drivers (Adreno GPUs, e.g. Mesa's Turnip in the zip packages made for libadrenotools, with `meta.json`
+and the driver library): "Install a driver (.zip)..." in the pause menu's GPU driver section opens a file picker,
+or `scripts/build-android.ps1 -Driver <zip>` copies a package to the phone, installed by the app at its next start.
+The driver chosen there applies when the game starts again; a start that crashes in the driver goes back to the
+system driver the next time. Vulkan drivers without dynamic rendering (Vulkan 1.1, e.g. older Mali) are drawn with
+render passes; `--render-passes` takes that path anywhere.
+
 Esc or F1 (gamepad: Guide, or both stick clicks) opens the pause menu: renderer (Vulkan or the software
 reference, switched when the menu closes), internal resolution, anti-aliasing (MSAA), fullscreen (also F11 / Alt+Enter), volume, frame limiter, frame skipping (keeps the game at full speed when the device cannot draw every frame), VSync, button glyphs (PlayStation / Xbox / Nintendo, by default those of the pad in use), the language (installed translations), on Android a 60 Hz display mode (saves battery on 120 Hz phones) and an FPS counter. Settings are kept in `ff7cc.ini` in the
 working directory. Saves go to `saves/`; the game's save and load screens open a slot picker. Mods can replace

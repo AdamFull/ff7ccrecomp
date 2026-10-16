@@ -43,7 +43,8 @@ android {
     }
 
     packaging {
-        jniLibs { useLegacyPackaging = false }
+        // Extracted to nativeLibraryDir: libadrenotools loads its hook libraries from there (custom GPU drivers).
+        jniLibs { useLegacyPackaging = true }
     }
 
     lint { abortOnError = false }
