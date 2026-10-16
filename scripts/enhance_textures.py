@@ -3,6 +3,9 @@ unedited and have no picture in assets/textures-hd go through an image-editing m
 (scripts/comfyui_enhance.py, FLUX.2 [klein] 4B) and land in assets/textures-ai, which the build packs below the
 hand-made layer (assets/textures edits > assets/textures-hd > assets/textures-ai).
 
+Only environment pictures (data/texture-environment.txt, from data/texture-classes.tsv): pictures with text or
+characters, and the character / monster / weapon models, are made by hand (owner, 2026-10-16). --all for every one.
+
     python scripts/enhance_textures.py --limit 20       # try a few first
     python scripts/enhance_textures.py                  # all the rest (about 5 s a texture on an 8 GB GPU)
     python scripts/enhance_textures.py --prompt-file my_prompt.txt
@@ -67,6 +70,9 @@ def main():
     ap.add_argument('--strength', type=int, default=100,
                     help='percent of the model\'s new detail kept, the rest from the original smoothly enlarged '
                          '(psptex enhance --strength; default 100, lower is softer)')
+    ap.add_argument('--only', type=Path, default=ROOT / 'data/texture-environment.txt',
+                    help='file listing the pictures to enhance (default: data/texture-environment.txt)')
+    ap.add_argument('--all', action='store_true', help='every scene picture, not only those --only lists')
     ap.add_argument('--2d', dest='with_2d', action='store_true', help='interface textures too')
     ap.add_argument('--redo', action='store_true',
                     help='make again the pictures an earlier run made that nobody changed since (edited ones stay)')
@@ -81,6 +87,10 @@ def main():
            '--skip-layer', str(ROOT / 'assets/textures-hd'), '--upscaler', upscaler, '--detail', str(args.detail),
            '--strength', str(args.strength),
            '--temp', str(tmp), '--keep-temp']
+    if not args.all:
+        if not args.only.exists():
+            sys.exit('%s not found (the environment list; --all for every picture)' % args.only)
+        cmd += ['--only', str(args.only)]
     if args.limit:
         cmd += ['--limit', str(args.limit)]
     if args.with_2d:

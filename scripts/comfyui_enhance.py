@@ -31,12 +31,13 @@ NODES = ['UNETLoader', 'CLIPLoader', 'VAELoader', 'LoadImage', 'ImageScaleToTota
          'EmptyFlux2LatentImage', 'Flux2Scheduler', 'CLIPTextEncode', 'ConditioningZeroOut', 'VAEEncode',
          'ReferenceLatent', 'CFGGuider', 'RandomNoise', 'KSamplerSelect', 'SamplerCustomAdvanced', 'VAEDecode',
          'SaveImage']
-# Asking for "sharp and highly detailed" gave crunchy textures (grit, scratches, hard micro-contrast) that lose the
-# game's painted look; this keeps it.
-PROMPT = ('Upscale this video game texture to 4x resolution. Keep the original\'s look exactly: its soft, painted '
-          'style, smooth gradients, the same amount of contrast and the same level of detail, only cleaner and at '
-          'higher resolution. Do not sharpen, do not add grit, scratches, cracks, noise or new details. Keep the same '
-          'layout, shapes, colours and lighting.')
+# The owner's prompt (it worked best with Gemini), plus a line against what this model adds on its own: asking for
+# "sharp and highly detailed" gave crunchy textures, and "keep the original's look exactly" gave little more than a
+# blurred original; this one gives clean new detail (rock, metal, panel lines), and psptex enhance pulls the colours
+# back to the original's (2026-10-16 comparison).
+PROMPT = ('Upscale this texture from Final Fantasy VII Crisis Core using AI enhancement, while preserving its original '
+          'aspect ratio and style. Smooth areas stay smooth: do not add cracks, scratches, stains or dirt that are not '
+          'in the original.')
 
 
 def request(url, data=None, headers=None):
@@ -178,11 +179,12 @@ def main():
     ap.add_argument('--prompt', default=PROMPT, help='the instruction given with every picture')
     ap.add_argument('--prompt-file', type=Path, help='read the instruction from a file')
     ap.add_argument('--steps', type=int, default=4, help='sampling steps (the distilled model is made for 4)')
-    # Hard pixels work best: the model takes them for a low-resolution picture to redraw cleanly, where a smoothly
-    # enlarged one reads as a blurry photo (stair-steps turned into cracks, small details invented).
-    ap.add_argument('--prescale', default='nearest-exact',
+    # With the first prompt hard pixels worked best (a smoothly enlarged picture read as a blurry photo); with the
+    # owner's prompt the model keeps hard pixels as they are (blocky results), and a smoothly enlarged picture comes
+    # out with clean edges and surfaces (2026-10-16 comparison on stage textures).
+    ap.add_argument('--prescale', default='lanczos',
                     choices=['nearest-exact', 'lanczos', 'bicubic', 'bilinear', 'area'],
-                    help='how the picture is enlarged to the model\'s size before it edits it (default: nearest-exact)')
+                    help='how the picture is enlarged to the model\'s size before it edits it (default: lanczos)')
     ap.add_argument('--megapixels', type=float, default=1.0,
                     help='largest size the model works at (default 1.0; smaller pictures work at 4x, at least 0.25)')
     ap.add_argument('--seed', type=int, default=1, help='the same seed gives the same result for the same picture')
