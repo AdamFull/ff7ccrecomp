@@ -78,6 +78,19 @@ function Invoke-Adb {
 }
 function Get-AdbShell([string]$command) { (& $adb -s $script:target shell $command 2>$null | Out-String).Trim() }
 
+# adb push --sync of a local folder into the remote folder $remoteParent. The folders are made first with mkdir in
+# the shell: on some phones (Samsung, Android 14) adbd cannot create folders under Android/data itself ("remote
+# secure_mkdirs() failed: Operation not permitted"), while it pushes into existing ones.
+function Push-Tree([string]$local, [string]$remoteParent) {
+    $base = Split-Path -Parent (Resolve-Path $local).Path
+    $dirs = @((Get-Item $local)) + @(Get-ChildItem $local -Recurse -Directory)
+    $remote = $dirs | ForEach-Object { "'" + $remoteParent.TrimEnd('/') + '/' + $_.FullName.Substring($base.Length + 1).Replace('\', '/') + "'" }
+    for ($i = 0; $i -lt $remote.Count; $i += 50) {  # a few dozen per shell command
+        Invoke-Adb shell ('mkdir -p ' + (($remote | Select-Object -Skip $i -First 50) -join ' '))
+    }
+    Invoke-Adb push --sync $local "$remoteParent/"
+}
+
 # Makes sure the app has created its own files folder (starting it once if needed) and that the app owns it.
 function Initialize-AppFolder {
     $uid = if ((Get-AdbShell "pm list packages -U $package") -match 'uid:(\d+)') { $Matches[1] } else { $null }
@@ -118,12 +131,12 @@ function Copy-GameData {
     Initialize-AppFolder
     Write-Host "Copying the game to $remoteFiles/$gameName (unchanged files are skipped)..."
     Invoke-Adb shell "mkdir -p '$remoteFiles/$gameName'"
-    Invoke-Adb push --sync (Join-Path $GameDir 'PSP_GAME') "$remoteFiles/$gameName/"
+    Push-Tree (Join-Path $GameDir 'PSP_GAME') "$remoteFiles/$gameName"
     if (Test-Path $CookedDir) {
         Write-Host "Copying cooked media to $remoteFiles/cooked..."
         Invoke-Adb shell "mkdir -p '$remoteFiles/cooked'"
         Get-ChildItem $CookedDir -Directory | Where-Object { $_.Name -notin 'tmp', 'textures-tmp', 'textures' } | ForEach-Object {
-            Invoke-Adb push --sync $_.FullName "$remoteFiles/cooked/"
+            Push-Tree $_.FullName "$remoteFiles/cooked"
         }
         # Baked HD textures: phones sample ASTC, so only those files go (hard links in a staging folder).
         Update-Textures
@@ -137,7 +150,7 @@ function Copy-GameData {
                 New-Item -ItemType HardLink -Path (Join-Path $stage $_.Name) -Target $_.FullName | Out-Null
             }
             Write-Host "Copying $($files.Count) HD textures (ASTC; unchanged ones are skipped)..."
-            Invoke-Adb push --sync $stage "$remoteFiles/cooked/"
+            Push-Tree $stage "$remoteFiles/cooked"
             # push --sync never removes anything: textures no longer packed stay on the phone. Listed, not deleted.
             $local = @{}; $files | ForEach-Object { $local[$_.Name] = $true }
             $stale = @(& $adb -s $script:target shell "ls '$remoteFiles/cooked/textures'" 2>$null |
