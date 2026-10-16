@@ -11,6 +11,16 @@
 // pixels' hash; then 2d|3d, archive entry, resource, offset). Pictures already there are never overwritten (they
 // may be edited); index lines are kept. Textures not found in the archive (made by the game while it runs) go to
 // runtime/. Collect more by playing or replaying with --tex-collect, then unpack again.
+//
+// `extract` needs no collection: model files (.bin: characters, monsters, weapons, stages) list their textures in
+// tables of 16-byte records (u16 width, u16 height, u32 bits per texel 4|8, u32 palette offset, u32 texels offset;
+// the palette is 16|256 RGBA8888 colours right before the texels), mostly swizzled (16-byte x 8-row blocks).
+// Every texture found is decoded as the game draws it (checked against a collection: 618 of 618 alike) and added
+// like an unpacked one, with its original picture in the collection folder (psptex pack --originals).
+//
+// One picture is listed once: the same pixels under another content hash (a texture drawn with leftovers of other
+// palettes in the CLUT entries it never reaches, or a model shared by several files) are skipped; replacements
+// are found by picture, so editing the one listed covers them all.
 
 #include <algorithm>
 #include <cstdio>
@@ -20,6 +30,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_PNG
 #include <stb_image.h>
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBI_WRITE_NO_STDIO_DEPRECATION
+#include <stb_image_write.h>
 
 #include "psprecore/cli.hpp"
 #include "psprecore/formats/cooked.hpp"
@@ -100,6 +113,37 @@ nx::vector<std::uint64_t> resource_starts(std::span<const std::byte> file) {
     return starts;
 }
 
+// <assets>/index.tsv: its lines, the content hashes and the pictures (size and pixels hash) it lists.
+struct Index {
+    nx::string path;
+    nx::vector<nx::string> lines;
+    nx::hash_set<nx::string> hashes, pictures;
+
+    explicit Index(const nx::string& assets) : path(path_join(assets, "index.tsv")), lines(cctex_lines(path)) {
+        for (const nx::string& line : lines)
+            if (!line.starts_with("#")) {
+                const auto cols = split(line, '\t');
+                if (cols.size() >= 2) hashes.insert(nx::string(cols[1]));
+                if (cols.size() >= 5) pictures.insert(picture(cols[2], cols[3], cols[4]));
+            }
+        if (lines.empty()) {
+            lines.push_back("# cctex: textures for editing; psptex pack turns edited pictures into replacements");
+            lines.push_back("# path\tcontent hash\twidth\theight\toriginal\tkind\tentry\tresource\toffset");
+        }
+    }
+    static nx::string picture(nx::string_view w, nx::string_view h, nx::string_view original) {
+        return nx::format("{}x{}:{}", w, h, original);
+    }
+    bool write() const {
+        nx::string text;
+        for (const nx::string& line : lines) text += line + "\n";
+        if (nx::fs::file_write_text(path, text).has_value()) return true;
+        std::fprintf(stderr, "cctex: cannot write %s\n", path.c_str());
+        return false;
+    }
+    static nx::vector<nx::string> cctex_lines(const nx::string& p) { return ::lines(p); }
+};
+
 int unpack(const nx::string& collection, const nx::string& game, const nx::string& assets) {
     // The collection.
     nx::vector<Texture> textures;
@@ -153,23 +197,12 @@ int unpack(const nx::string& collection, const nx::string& game, const nx::strin
     }
 
     // The pictures, laid out by where they come from.
-    const nx::string index_path = path_join(assets, "index.tsv");
-    nx::vector<nx::string> index = lines(index_path);
-    nx::hash_set<nx::string> listed;
-    for (const nx::string& line : index)
-        if (!line.starts_with("#")) {
-            const auto cols = split(line, '\t');
-            if (cols.size() >= 2) listed.insert(nx::string(cols[1]));
-        }
-    if (index.empty()) {
-        index.push_back("# cctex unpack: textures for editing; psptex pack turns edited pictures into replacements");
-        index.push_back("# path\tcontent hash\twidth\theight\toriginal\tkind\tentry\tresource\toffset");
-    }
+    Index index(assets);
     nx::hash_map<std::int64_t, nx::vector<std::uint64_t>> resources;  // atel entries' resource starts
-    std::size_t added = 0, found = 0, kept = 0;
+    std::size_t added = 0, found = 0, kept = 0, same_picture = 0;
     for (const Texture& t : textures) {
         if (t.entry >= 0) ++found;
-        if (listed.contains(t.hash)) {
+        if (index.hashes.contains(t.hash)) {
             ++kept;
             continue;
         }
@@ -205,21 +238,148 @@ int unpack(const nx::string& collection, const nx::string& game, const nx::strin
         const std::uint64_t original =
             cooked::fnv1a64(std::span(reinterpret_cast<const std::byte*>(pixels), static_cast<std::size_t>(w) * h * 4));
         stbi_image_free(pixels);
+        if (!index.pictures.insert(Index::picture(nx::format("{}", w), nx::format("{}", h), nx::format("{:016X}", original)))
+                 .second) {
+            ++same_picture;
+            continue;
+        }
         (void)nx::fs::create_directories(parent_path(target));
         if (!nx::fs::exists(target)) (void)nx::fs::copy(path_join(collection, t.hash + ".png"), target, false);
-        index.push_back(nx::format("{}\t{}\t{}\t{}\t{:016X}\t{}\t{}\t{}\t{:X}", relative, t.hash, w, h, original,
+        index.lines.push_back(nx::format("{}\t{}\t{}\t{}\t{:016X}\t{}\t{}\t{}\t{:X}", relative, t.hash, w, h, original,
                                    t.two_d ? "2d" : "3d", t.entry >= 0 ? nx::format("{:05}", t.entry) : nx::string("-"),
                                    resource, offset));
         ++added;
     }
-    nx::string text;
-    for (const nx::string& line : index) text += line + "\n";
-    if (!nx::fs::file_write_text(index_path, text).has_value()) {
-        std::fprintf(stderr, "cctex: cannot write %s\n", index_path.c_str());
-        return 1;
+    if (!index.write()) return 1;
+    std::fprintf(stderr,
+                 "%zu found in the archive, %zu made at run time; %zu added to %s (%zu listed before, %zu the same "
+                 "picture as one listed)\n",
+                 found, textures.size() - found, added, assets.c_str(), kept, same_picture);
+    return 0;
+}
+
+// A texture of a model file's table, decoded: its RGBA8888 palette colours by texel, plain or swizzled.
+void decode(std::span<const std::byte> file, int w, int h, int bits, std::uint32_t palette, std::uint32_t texels,
+            bool swizzled, nx::vector<std::uint32_t>& out) {
+    const std::size_t pitch = static_cast<std::size_t>(w) * static_cast<std::size_t>(bits) / 8;
+    const std::byte* src = file.data() + texels;
+    const auto colour = [&](unsigned i) {
+        std::uint32_t c;
+        std::memcpy(&c, file.data() + palette + i * 4, 4);
+        return c;
+    };
+    out.resize(static_cast<std::size_t>(w) * static_cast<std::size_t>(h));
+    for (int y = 0; y < h; ++y) {
+        const auto yy = static_cast<std::size_t>(y);
+        std::uint32_t* row = out.data() + yy * static_cast<std::size_t>(w);
+        for (std::size_t x = 0; x < pitch; ++x) {
+            // Swizzled: 16-byte x 8-row blocks, row by row.
+            const std::size_t at = swizzled ? ((yy / 8 * (pitch / 16) + x / 16) * 8 + yy % 8) * 16 + x % 16 : yy * pitch + x;
+            const auto byte = static_cast<unsigned>(src[at]);
+            if (bits == 8) {
+                row[x] = colour(byte);
+            } else {
+                row[x * 2] = colour(byte & 15u);
+                row[x * 2 + 1] = colour(byte >> 4);
+            }
+        }
     }
-    std::fprintf(stderr, "%zu found in the archive, %zu made at run time; %zu added to %s (%zu listed before)\n", found,
-                 textures.size() - found, added, assets.c_str(), kept);
+}
+
+// How much neighbouring texels differ (mean over R, G, B, right and below): a texture read the wrong way round is
+// noise.
+double roughness(const nx::vector<std::uint32_t>& px, int w, int h) {
+    std::uint64_t sum = 0, n = 0;
+    const auto diff = [](std::uint32_t a, std::uint32_t b) {
+        int d = 0;
+        for (int s = 0; s < 24; s += 8) d += std::abs(static_cast<int>((a >> s) & 0xFF) - static_cast<int>((b >> s) & 0xFF));
+        return static_cast<std::uint64_t>(d);
+    };
+    const auto at = [&](int x, int y) { return px[static_cast<std::size_t>(y) * static_cast<std::size_t>(w) + static_cast<std::size_t>(x)]; };
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x) {
+            if (x + 1 < w) sum += diff(at(x, y), at(x + 1, y)), n += 3;
+            if (y + 1 < h) sum += diff(at(x, y), at(x, y + 1)), n += 3;
+        }
+    return n ? static_cast<double>(sum) / static_cast<double>(n) : 0.0;
+}
+
+constexpr double kNoise = 40.0;  // roughness of a texture decoded wrongly or of data that is no texture (real: below)
+
+int extract(const nx::string& game, const nx::string& assets, const nx::string& collection) {
+    pkg::Reader reader(pkg::locate(game));
+    Index index(assets);
+    (void)nx::fs::create_directories(collection);
+    std::size_t tables = 0, added = 0, same_picture = 0, noise = 0, files = 0;
+    nx::vector<std::uint32_t> plain, swizzled;
+    for (std::size_t e = 0; e < reader.size(); ++e) {
+        const nx::vector<std::byte> file = reader.read(e);
+        const nx::string folder = nx::format(
+            "{:05}{}", e, pkg::type_extension(pkg::sniff(std::span(file).first(std::min<std::size_t>(file.size(), 16)))));
+        if (!folder.ends_with(".bin")) continue;
+        nx::hash_set<std::uint32_t> seen;  // texels offsets (a table can list a texture more than once)
+        bool any = false;
+        for (std::size_t at = 0; at + 16 <= file.size(); at += 4) {
+            std::uint16_t w = 0, h = 0;
+            std::uint32_t bits = 0, palette = 0, texels = 0;
+            std::memcpy(&w, file.data() + at, 2);
+            std::memcpy(&h, file.data() + at + 2, 2);
+            std::memcpy(&bits, file.data() + at + 4, 4);
+            std::memcpy(&palette, file.data() + at + 8, 4);
+            std::memcpy(&texels, file.data() + at + 12, 4);
+            const auto pow2 = [](unsigned v) { return v >= 8 && v <= 512 && (v & (v - 1)) == 0; };
+            if (!pow2(w) || !pow2(h) || (bits != 4 && bits != 8) || palette == 0) continue;
+            if (texels < palette || texels - palette != (bits == 4 ? 64u : 1024u)) continue;
+            const std::size_t size = std::size_t{w} * h * bits / 8;
+            if (texels + size > file.size() || !seen.insert(texels).second) continue;
+            ++tables;
+            // Plain or swizzled: whichever reads as a picture.
+            decode(file, w, h, static_cast<int>(bits), palette, texels, false, plain);
+            double best = roughness(plain, w, h);
+            const nx::vector<std::uint32_t>* px = &plain;
+            if (std::size_t{w} * bits / 8 >= 16 && h % 8 == 0) {
+                decode(file, w, h, static_cast<int>(bits), palette, texels, true, swizzled);
+                if (const double r = roughness(swizzled, w, h); r < best) {
+                    best = r;
+                    px = &swizzled;
+                }
+            }
+            if (best > kNoise) {
+                ++noise;
+                continue;
+            }
+            const nx::string original = nx::format("{:016X}", cooked::fnv1a64(std::as_bytes(std::span(*px))));
+            if (!index.pictures.insert(Index::picture(nx::format("{}", w), nx::format("{}", h), original)).second) {
+                ++same_picture;
+                continue;
+            }
+            // Its content hash: palette and texels (a collected texture's has the CLUT as the game loaded it instead;
+            // replacements are found by picture either way).
+            const nx::string hash =
+                nx::format("{:016X}", cooked::fnv1a64(std::span(file.data() + palette, texels - palette + size)));
+            const nx::string relative = nx::format("{}/{:06X}_{}.png", folder, texels, hash);
+            const nx::string target = path_join(assets, relative);
+            (void)nx::fs::create_directories(parent_path(target));
+            const auto save = [&](const nx::string& path) {
+                return nx::fs::exists(path) || stbi_write_png(path.c_str(), w, h, 4, px->data(), w * 4) != 0;
+            };
+            if (!save(target) || !save(path_join(collection, hash + ".png"))) {
+                std::fprintf(stderr, "cctex: cannot write %s\n", target.c_str());
+                return 1;
+            }
+            index.hashes.insert(hash);
+            index.lines.push_back(
+                nx::format("{}\t{}\t{}\t{}\t{}\t3d\t{:05}\t-\t{:X}", relative, hash, w, h, original, e, texels));
+            ++added;
+            any = true;
+        }
+        if (any) ++files;
+    }
+    if (!index.write()) return 1;
+    std::fprintf(stderr,
+                 "%zu textures in model tables: %zu added to %s from %zu files, %zu the same picture as one listed, "
+                 "%zu not pictures (noise)\n",
+                 tables, added, assets.c_str(), files, same_picture, noise);
     return 0;
 }
 
@@ -232,10 +392,15 @@ int main(int argc, char** argv) {
         .positional("collection", collection, "texture collection folder")
         .positional("game", game, "the game (disc folder)")
         .positional("assets", assets, "folder for the editable pictures (e.g. assets/textures)");
+    cli.command("extract", "the model files' textures (no collection needed) -> <assets>, originals -> <collection>")
+        .positional("game", game, "the game (disc folder)")
+        .positional("assets", assets, "folder for the editable pictures (e.g. assets/textures)")
+        .positional("collection", collection, "texture collection folder (psptex pack --originals)");
     nx::string command;
     if (const int code = parse_command_line(cli, argc, argv, &command); code >= 0) return code;
     try {
         if (command == "unpack") return unpack(collection, game, assets);
+        if (command == "extract") return extract(game, assets, collection);
         std::fputs(cli.help().c_str(), stderr);
         return 2;
     } catch (const std::exception& e) {
