@@ -8,7 +8,7 @@
 #include "psprecore/gpu/button_icons.hpp"
 #include "psprecore/gpu/ui_font.hpp"
 #include "psprecore/platform/frontend.hpp"
-#include "psprecore/runtime/hle.hpp"
+#include "psprecore/runtime/system.hpp"
 #include "fonts.hpp"
 #include "mods.hpp"
 
@@ -23,9 +23,9 @@ constexpr std::uint64_t kUnskippableMovies[] = {0x001A60EC489C619Dull};
 
 namespace {
 
-void mount(std::span<const nx::string> mods) {
-    install_archive();
-    set_mods(mods);
+void mount(rt::System& system, std::span<const nx::string> mods) {
+    install_archive(system.storage);
+    set_mods(system.storage, mods);
     collect_mod_glyphs(mods);
 }
 
@@ -36,6 +36,7 @@ constexpr platform::GameInfo kGame{
     .load_base = 0x08804000,
     .mount = mount,
     .loaded = install_mod_glyphs,
+    .unskippable_movies = kUnskippableMovies,
 };
 
 }  // namespace
@@ -45,6 +46,5 @@ constexpr platform::GameInfo kGame{
 int main(int argc, char** argv) {
     psprecore::rt::gpu::set_icon_atlases(ff7cc::game::kIconAtlases);
     psprecore::rt::gpu::set_ui_font(ff7cc::game::ui_font());
-    psprecore::rt::set_unskippable_movies(ff7cc::game::kUnskippableMovies);
     return psprecore::platform::run_game(ff7cc::game::kGame, argc, argv);
 }

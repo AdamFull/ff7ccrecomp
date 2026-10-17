@@ -12,7 +12,7 @@
 #include <iterator>
 
 #include "psprecore/game/game.hpp"
-#include "psprecore/runtime/hle.hpp"
+#include "psprecore/runtime/system.hpp"
 
 using namespace psprecore::game;
 
@@ -79,7 +79,7 @@ void register_anchors(u32 list, Box* boxes) {
         if (!v || !quads || quads > 4096) continue;
         const Anchor* a = anchor_of(load<u32>(r + kId) & 0xFFFF);
         // Elements not listed stay where the game puts them, also over a panel (damage numbers).
-        psprecore::rt::anchor_2d(v, v + quads * 6 * kVertexSize, a ? a->horizontal : 0, a ? a->vertical : 0);
+        psprecore::rt::System::current().layout_2d.anchor(v, v + quads * 6 * kVertexSize, a ? a->horizontal : 0, a ? a->vertical : 0);
         if (!a || load<u32>(r + 28)) continue;  // (+28: hidden)
         Box& b = boxes[a - kAnchors];
         for (u32 i = 0; i < quads * 6; ++i) {
@@ -96,7 +96,7 @@ void register_anchors(u32 list, Box* boxes) {
 // The first UI draw pass, f_088EA200(ui); the second (f_088EA438) follows in the same frame.
 GAME_FUNC(088EA200, ui_draw) {
     const u32 ui = arg(ctx, 0);
-    psprecore::rt::clear_2d_anchors();
+    psprecore::rt::System::current().layout_2d.clear();
     Box boxes[std::size(kAnchors)];
     for (const u32 list : {ui + 0x2CD0, ui + 0x2CF8}) {
         log_ids(list);
@@ -108,7 +108,7 @@ GAME_FUNC(088EA200, ui_draw) {
         constexpr float kEdge = 4, kBeyond = 1000;  // a panel at an edge takes in what reaches past it
         b.x0 = b.x0 <= kEdge ? -kBeyond : b.x0, b.x1 = b.x1 >= 480 - kEdge ? 480 + kBeyond : b.x1;
         b.y0 = b.y0 <= kEdge ? -kBeyond : b.y0, b.y1 = b.y1 >= 272 - kEdge ? 272 + kBeyond : b.y1;
-        psprecore::rt::anchor_2d_region(b.x0, b.y0, b.x1, b.y1, kAnchors[i].horizontal, kAnchors[i].vertical);
+        psprecore::rt::System::current().layout_2d.anchor_region(b.x0, b.y0, b.x1, b.y1, kAnchors[i].horizontal, kAnchors[i].vertical);
     }
     GAME_ORIGINAL(088EA200);
 }

@@ -4,7 +4,7 @@
 #include <cmath>
 
 #include "psprecore/game/game.hpp"
-#include "psprecore/runtime/hle.hpp"
+#include "psprecore/runtime/system.hpp"
 
 using namespace psprecore::game;
 
@@ -49,7 +49,7 @@ GAME_FUNC(088FD518, field_camera) {
     const float ty = load<float>(followed + 36) + load<float>(camera + 236);
     const float height = load<float>(camera + 232);
     float yaw = 0, pitch = 0;
-    const bool look = psprecore::rt::take_camera_look(yaw, pitch);
+    const bool look = psprecore::rt::System::current().input.take_camera_look(yaw, pitch);
     if (look) {  // the target as the original places it, for the sight tests
         store<float>(camera + 208, tx);
         store<float>(camera + 212, ty);
@@ -94,7 +94,7 @@ GAME_FUNC(088FD518, field_camera) {
 // The look turn is an offset to those angles that lasts the battle, the pitch kept within clamp_pitch().
 GAME_FUNC(08967510, orbit_eye) {
     float yaw = 0, pitch = 0;
-    if (psprecore::rt::take_camera_look(yaw, pitch)) {
+    if (psprecore::rt::System::current().input.take_camera_look(yaw, pitch)) {
         battle_yaw = std::remainder(battle_yaw + yaw, 6.2831853f);
         battle_pitch -= pitch;  // looking up lowers the eye
     }

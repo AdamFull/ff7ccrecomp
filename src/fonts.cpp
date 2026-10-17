@@ -8,7 +8,7 @@
 #include "ff7cc/formats/font.hpp"
 #include "psprecore/error.hpp"
 #include "psprecore/io/path.hpp"
-#include "psprecore/runtime/kernel.hpp"
+#include "psprecore/runtime/system.hpp"
 #include "core/foundation/containers/map.h"
 #include "core/foundation/platform/filesystem.h"
 
@@ -41,10 +41,10 @@ void collect_mod_glyphs(std::span<const nx::string> mods) {
     }
 }
 
-void install_mod_glyphs() {
+void install_mod_glyphs(rt::System& system) {
     if (g_advances.empty()) return;
-    rt::Kernel& kernel = rt::kernel();
-    rt::GuestMemory& mem = kernel.memory();
+    rt::Kernel& kernel = system.kernel;
+    rt::GuestMemory& mem = system.memory;
     int last = font::kFirstGlyphs - 1;
     for (const auto& [index, _] : g_advances) last = std::max(last, index);
     const auto glyphs = static_cast<std::uint32_t>(last + 1);

@@ -6,12 +6,14 @@
 
 #include <span>
 
+#include "ff7cc/core.hpp"
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/strings/utf8_string.h"
+#include "psprecore/runtime/system.hpp"
 
 namespace ff7cc::game {
 
 void collect_mod_glyphs(std::span<const nx::string> mods);  // when the disc is mounted (the active mods)
-void install_mod_glyphs();                          // once the game is in memory, before it runs
+void install_mod_glyphs(rt::System& system);                          // once the game is in memory, before it runs
 
 }  // namespace ff7cc::game

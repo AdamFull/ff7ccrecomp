@@ -7,7 +7,7 @@
 #include "ff7cc/formats/pkg.hpp"
 #include "psprecore/io/file.hpp"
 #include "psprecore/io/path.hpp"
-#include "psprecore/runtime/io.hpp"
+#include "psprecore/runtime/storage.hpp"
 #include "psprecore/text.hpp"
 #include "core/foundation/containers/map.h"
 
@@ -25,6 +25,8 @@ constexpr const char* kFse = "PSP_GAME/USRDIR/discimg.fse";
 // files by position (moving a module past the movies changes how it is loaded).
 class ModOverlay final : public rt::DiscOverlay {
 public:
+    explicit ModOverlay(rt::Storage& s) : storage(s) {}
+    rt::Storage& storage;
     struct Entry {
         std::uint64_t sector = 0, sectors = 0;  // virtual position, relative to the start of discimg.pkg
         std::uint64_t source_sector = 0;        // original position (unmodified entries)
@@ -43,7 +45,7 @@ public:
             const std::uint64_t from = std::max(s, it->sector), to = std::min(end, it->sector + it->sectors);
             char* dst = out + (from - first) * kSector;
             if (it->mod.empty()) {
-                rt::read_disc_sectors(it->source_sector + from - it->sector, to - from, dst);
+                storage.read_disc_sectors(it->source_sector + from - it->sector, to - from, dst);
             } else if (auto mod = nx::fs::open_file(it->mod); mod.has_value()) {
                 if (mod.value()->seek(static_cast<std::int64_t>((from - it->sector) * kSector)))
                     (void)mod.value()->read(dst, static_cast<std::size_t>((to - from) * kSector));  // last sector: zero-padded
@@ -57,10 +59,10 @@ public:
 
 }  // namespace
 
-void install_archive() { rt::map_disc_file(kPkg, kPkgLbn); }
+void install_archive(rt::Storage& storage) { storage.map_disc_file(kPkg, kPkgLbn); }
 
-void set_mods(std::span<const nx::string> mods) {
-    rt::set_disc_overlay(nullptr);
+void set_mods(rt::Storage& storage, std::span<const nx::string> mods) {
+    storage.set_disc_overlay(nullptr);
     nx::map<std::size_t, nx::string> replaced;  // entry -> file (later mods win)
     std::size_t folders = 0;
     for (const auto& m : mods) {
@@ -78,13 +80,13 @@ void set_mods(std::span<const nx::string> mods) {
     }
     if (replaced.empty()) return;
 
-    const auto index = value_or_throw(io::read_file(path_join(rt::game_dir(), kFse)));
+    const auto index = value_or_throw(io::read_file(path_join(storage.game_dir(), kFse)));
     auto entries = pkg::parse_index(index);
     for (const auto& [i, path] : replaced)
         if (i >= entries.size())
             std::fprintf(stderr, "mods: %s replaces entry %zu, but the archive has %zu entries\n", path.c_str(), i,
                          entries.size());
-    auto overlay = std::make_unique<ModOverlay>();
+    auto overlay = std::make_unique<ModOverlay>(storage);
     std::uint64_t next = 0;
     overlay->entries.reserve(entries.size());
     for (std::size_t i = 0; i < entries.size(); ++i) {
@@ -103,7 +105,7 @@ void set_mods(std::span<const nx::string> mods) {
     const auto patched = pkg::serialize_index(entries);
     overlay->fse.assign(reinterpret_cast<const char*>(patched.data()), reinterpret_cast<const char*>(patched.data()) + patched.size());
     std::fprintf(stderr, "mods: %zu archive entries replaced from %zu mod folders\n", replaced.size(), folders);
-    rt::set_disc_overlay(std::move(overlay));
+    storage.set_disc_overlay(std::move(overlay));
 }
 
 }  // namespace ff7cc::game
