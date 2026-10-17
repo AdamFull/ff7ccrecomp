@@ -34,7 +34,7 @@ try {
             Set-Location $root
             $ErrorActionPreference = 'Continue'
             $out = & $exe $game --headless --cooked $cooked --replay $rec --vblanks $last --state-hash $every 2>&1
-            [pscustomobject]@{ Recording = $rec; Hashes = @($out | ForEach-Object { "$_" } | Where-Object { $_ -like 'state vblank*' }) }
+            [pscustomobject]@{ Recording = $rec; Hashes = @($out | ForEach-Object { "$_" } | ForEach-Object { if ($_ -match 'state vblank .*') { $Matches[0] } }) }
         }
     }
     $results = $jobs | Wait-Job | Receive-Job
