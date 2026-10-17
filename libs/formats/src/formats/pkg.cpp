@@ -17,15 +17,15 @@ namespace ff7cc::pkg {
 
 namespace {
 
-std::uint32_t load_u32(const std::byte* p) {
+std::uint32_t load_u32(const u8* p) {
     std::uint32_t v;
     std::memcpy(&v, p, sizeof v);
     return v;
 }
 
-void store_u32(std::byte* p, std::uint32_t v) { std::memcpy(p, &v, sizeof v); }
+void store_u32(u8* p, std::uint32_t v) { std::memcpy(p, &v, sizeof v); }
 
-bool has_magic(std::span<const std::byte> head, nx::string_view magic) {
+bool has_magic(std::span<const u8> head, nx::string_view magic) {
     return head.size() >= magic.size() && std::memcmp(head.data(), magic.data(), magic.size()) == 0;
 }
 
@@ -52,21 +52,21 @@ const TypeInfo& info(FileType type) {
 
 }  // namespace
 
-nx::vector<Entry> parse_index(std::span<const std::byte> fse) {
+nx::vector<Entry> parse_index(std::span<const u8> fse) {
     if (fse.size() % kEntrySize != 0)
-        throw FormatError("discimg.fse size " + nx::format("{}", fse.size()) + " is not a multiple of 12");
+        throw Exception("discimg.fse size " + nx::format("{}", fse.size()) + " is not a multiple of 12");
     nx::vector<Entry> entries(fse.size() / kEntrySize);
     for (std::size_t i = 0; i < entries.size(); ++i) {
-        const std::byte* p = fse.data() + i * kEntrySize;
+        const u8* p = fse.data() + i * kEntrySize;
         entries[i] = Entry{load_u32(p), load_u32(p + 4), load_u32(p + 8)};
     }
     return entries;
 }
 
-nx::vector<std::byte> serialize_index(std::span<const Entry> entries) {
-    nx::vector<std::byte> out(entries.size() * kEntrySize);
+nx::vector<u8> serialize_index(std::span<const Entry> entries) {
+    nx::vector<u8> out(entries.size() * kEntrySize);
     for (std::size_t i = 0; i < entries.size(); ++i) {
-        std::byte* p = out.data() + i * kEntrySize;
+        u8* p = out.data() + i * kEntrySize;
         store_u32(p, entries[i].sector);
         store_u32(p + 4, entries[i].size);
         store_u32(p + 8, entries[i].reserved);
@@ -79,14 +79,14 @@ void validate_index(std::span<const Entry> entries, std::uint64_t archive_size) 
     for (std::size_t i = 0; i < entries.size(); ++i) {
         const Entry& e = entries[i];
         if (e.offset() < min_offset)
-            throw FormatError("entry " + nx::format("{}", i) + " overlaps the previous file");
+            throw Exception("entry " + nx::format("{}", i) + " overlaps the previous file");
         if (e.end() > archive_size)
-            throw FormatError("entry " + nx::format("{}", i) + " runs past the end of the archive");
+            throw Exception("entry " + nx::format("{}", i) + " runs past the end of the archive");
         min_offset = e.end();
     }
 }
 
-FileType sniff(std::span<const std::byte> head) {
+FileType sniff(std::span<const u8> head) {
     if (head.empty()) return FileType::Empty;
     if (has_magic(head, "Atel")) return FileType::Atel;
     if (has_magic(head, "RIFF")) return FileType::Riff;
@@ -110,7 +110,7 @@ ArchivePaths locate(nx::fs::path_view dir) {
         ArchivePaths paths{path_join(base, "discimg.fse"), path_join(base, "discimg.pkg")};
         if (is_file(paths.fse) && is_file(paths.pkg)) return paths;
     }
-    throw IoError(nx::string("discimg.fse/discimg.pkg not found under '") + dir.native() + "'");
+    throw Exception(nx::string("discimg.fse/discimg.pkg not found under '") + dir.native() + "'");
 }
 
 ArchivePaths output_paths(nx::fs::path_view dir) {
@@ -120,7 +120,7 @@ ArchivePaths output_paths(nx::fs::path_view dir) {
 // ---------------------------------------------------------------------------------------------
 
 Reader::Reader(const ArchivePaths& paths)
-    : entries_(parse_index(io::read_all(paths.fse))), pkg_(paths.pkg, io::File::Mode::Read) {
+    : entries_(parse_index(value_or_throw(io::read_file(paths.fse)))), pkg_(paths.pkg, io::File::Mode::Read) {
     archive_size_ = pkg_.size();
     validate_index(entries_, archive_size_);
 }
@@ -132,21 +132,21 @@ const Entry& Reader::entry(std::size_t index) const {
     return entries_[index];
 }
 
-nx::vector<std::byte> Reader::read(std::size_t index) {
+nx::vector<u8> Reader::read(std::size_t index) {
     const Entry& e = entry(index);
-    nx::vector<std::byte> data(e.size);
+    nx::vector<u8> data(e.size);
     pkg_.read_exact_at(e.offset(), data);
     return data;
 }
 
-std::size_t Reader::read_head(std::size_t index, std::span<std::byte> out) {
+std::size_t Reader::read_head(std::size_t index, std::span<u8> out) {
     const Entry& e = entry(index);
     const std::size_t n = std::min<std::size_t>(out.size(), e.size);
     pkg_.read_exact_at(e.offset(), out.first(n));
     return n;
 }
 
-void Reader::read_at(std::size_t index, std::uint64_t offset, std::span<std::byte> out) {
+void Reader::read_at(std::size_t index, std::uint64_t offset, std::span<u8> out) {
     const Entry& e = entry(index);
     if (offset > e.size || out.size() > e.size - offset)
         throw Error("read past the end of file " + nx::format("{}", index));
@@ -154,7 +154,7 @@ void Reader::read_at(std::size_t index, std::uint64_t offset, std::span<std::byt
 }
 
 FileType Reader::sniff(std::size_t index) {
-    std::array<std::byte, 16> head{};
+    std::array<u8, 16> head{};
     const std::size_t n = read_head(index, head);
     return pkg::sniff(std::span(head.data(), n));
 }
@@ -170,7 +170,7 @@ Writer::Writer(const ArchivePaths& paths) : paths_(paths), pkg_(paths.pkg, io::F
 
 Entry Writer::begin_entry(std::uint64_t size) {
     if (size > std::numeric_limits<std::uint32_t>::max())
-        throw FormatError("file " + nx::format("{}", entries_.size()) + " is larger than 4 GiB");
+        throw Exception("file " + nx::format("{}", entries_.size()) + " is larger than 4 GiB");
     return Entry{next_sector_, static_cast<std::uint32_t>(size), 0};
 }
 
@@ -178,12 +178,12 @@ void Writer::end_entry(const Entry& entry) {
     const std::uint64_t padding = std::uint64_t{entry.sector_count()} * kSectorSize - entry.size;
     pkg_.write_zeros(padding);
     const std::uint64_t next = std::uint64_t{next_sector_} + entry.sector_count();
-    if (next > std::numeric_limits<std::uint32_t>::max()) throw FormatError("archive exceeds the sector limit");
+    if (next > std::numeric_limits<std::uint32_t>::max()) throw Exception("archive exceeds the sector limit");
     next_sector_ = static_cast<std::uint32_t>(next);
     entries_.push_back(entry);
 }
 
-void Writer::add(std::span<const std::byte> data) {
+void Writer::add(std::span<const u8> data) {
     const Entry e = begin_entry(data.size());
     pkg_.write(data);
     end_entry(e);
@@ -202,7 +202,7 @@ void Writer::add_file(nx::fs::path_view path) {
 
 void Writer::finish() {
     pkg_.close();
-    io::write_all(paths_.fse, serialize_index(entries_));
+    value_or_throw(io::write_file(paths_.fse, serialize_index(entries_)));
 }
 
 }  // namespace ff7cc::pkg

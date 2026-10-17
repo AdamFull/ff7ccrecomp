@@ -73,12 +73,12 @@ void set_mods(std::span<const nx::string> mods) {
             if (f.type != nx::fs::file_type::regular || stem.empty() ||
                 stem.view().find_first_not_of("0123456789") != nx::string_view::npos)
                 continue;
-            replaced[static_cast<std::size_t>(parse_u64(stem))] = f.path;
+            replaced[static_cast<std::size_t>(value_or_throw(parse_u64(stem)))] = f.path;
         }
     }
     if (replaced.empty()) return;
 
-    const auto index = io::read_all(path_join(rt::game_dir(), kFse));
+    const auto index = value_or_throw(io::read_file(path_join(rt::game_dir(), kFse)));
     auto entries = pkg::parse_index(index);
     for (const auto& [i, path] : replaced)
         if (i >= entries.size())

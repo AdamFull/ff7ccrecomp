@@ -51,16 +51,16 @@ struct Message {
     friend bool operator==(const Message&, const Message&) = default;
 };
 
-bool is_mbd(std::span<const std::byte> data);
-nx::vector<Message> parse(std::span<const std::byte> data);  // throws FormatError
-nx::vector<std::byte> serialize(const nx::vector<Message>& messages);
+bool is_mbd(std::span<const u8> data);
+nx::vector<Message> parse(std::span<const u8> data);  // throws FormatError
+nx::vector<u8> serialize(const nx::vector<Message>& messages);
 
 // Scripts address messages by their byte offset in the table (e.g. Mes(2128, 18, ...) = offset 2128 of resource
 // 18), so translated tables must keep every message where it was. A changed message that fits in its original
 // space is written there (the rest is zero-filled); a longer one keeps its header at the original offset while its
 // pages move to the end of the table (page offsets are relative to the message start). `changes` maps message
 // indices of `original` to their new content.
-nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<std::size_t, Message>& changes);
+nx::vector<u8> patch(std::span<const u8> original, const nx::map<std::size_t, Message>& changes);
 
 // Glyph index -> UTF-8 text. Unnamed glyphs are written as {G:n}.
 struct Charset {

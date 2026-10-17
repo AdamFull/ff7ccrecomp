@@ -13,16 +13,16 @@ using namespace ff7cc;
 
 namespace {
 
-nx::vector<std::byte> bytes(nx::string_view text) {
-    nx::vector<std::byte> out(text.size());
+nx::vector<u8> bytes(nx::string_view text) {
+    nx::vector<u8> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
 }
 
-nx::vector<std::byte> random_bytes(std::size_t n, unsigned seed) {
+nx::vector<u8> random_bytes(std::size_t n, unsigned seed) {
     std::mt19937 rng(seed);
-    nx::vector<std::byte> out(n);
-    for (auto& b : out) b = static_cast<std::byte>(rng() & 0xff);
+    nx::vector<u8> out(n);
+    for (auto& b : out) b = static_cast<u8>(rng() & 0xff);
     return out;
 }
 
@@ -47,21 +47,21 @@ TEST_CASE("index serialize/parse round-trip") {
     CHECK(raw.size() == entries.size() * pkg::kEntrySize);
     CHECK(pkg::parse_index(raw) == entries);
     // Layout check: little-endian {sector, size, reserved}.
-    CHECK(raw[12] == std::byte{2} && raw[16] == std::byte{0x80} && raw[17] == std::byte{0x2b});
+    CHECK(raw[12] == u8{2} && raw[16] == u8{0x80} && raw[17] == u8{0x2b});
 }
 
 TEST_CASE("index with a truncated entry is rejected") {
-    const nx::vector<std::byte> raw(13);
-    CHECK_THROWS_AS(pkg::parse_index(raw), FormatError);
+    const nx::vector<u8> raw(13);
+    CHECK_THROWS_AS(pkg::parse_index(raw), Exception);
 }
 
 TEST_CASE("validate_index detects overlap and overrun") {
     const nx::vector<pkg::Entry> ok{{0, 100, 0}, {1, 2048, 0}, {2, 0, 0}};
     pkg::validate_index(ok, 2 * pkg::kSectorSize);
     const nx::vector<pkg::Entry> overlap{{0, 4096, 0}, {1, 10, 0}};
-    CHECK_THROWS_AS(pkg::validate_index(overlap, 1 << 20), FormatError);
+    CHECK_THROWS_AS(pkg::validate_index(overlap, 1 << 20), Exception);
     const nx::vector<pkg::Entry> overrun{{0, 4097, 0}};
-    CHECK_THROWS_AS(pkg::validate_index(overrun, 4096), FormatError);
+    CHECK_THROWS_AS(pkg::validate_index(overrun, 4096), Exception);
 }
 
 TEST_CASE("sniff recognises known magics") {
@@ -79,7 +79,7 @@ TEST_CASE("writer output reads back identically") {
     const nx::string game = path_join(dir.path, "PSP_GAME", "USRDIR");
     (void)nx::fs::create_directories(game);
 
-    const nx::vector<nx::vector<std::byte>> files{
+    const nx::vector<nx::vector<u8>> files{
         bytes("Atel header"), random_bytes(pkg::kSectorSize, 1), {}, random_bytes(5000, 2), {}, bytes("x"),
     };
     {
@@ -101,7 +101,7 @@ TEST_CASE("writer output reads back identically") {
     CHECK(reader.sniff(0) == pkg::FileType::Atel);
     CHECK(reader.sniff(2) == pkg::FileType::Empty);
 
-    nx::vector<std::byte> mid(10);
+    nx::vector<u8> mid(10);
     reader.read_at(3, 4000, mid);
     CHECK(std::equal(mid.begin(), mid.end(), files[3].begin() + 4000));
     CHECK_THROWS_AS(reader.read_at(3, 4995, mid), Error);
@@ -110,5 +110,5 @@ TEST_CASE("writer output reads back identically") {
 
 TEST_CASE("locate reports a missing archive") {
     TempDir dir;
-    CHECK_THROWS_AS(pkg::locate(dir.path), IoError);
+    CHECK_THROWS_AS(pkg::locate(dir.path), Exception);
 }

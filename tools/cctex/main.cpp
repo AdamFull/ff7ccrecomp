@@ -34,6 +34,7 @@
 #define STBI_WRITE_NO_STDIO_DEPRECATION
 #include <stb_image_write.h>
 
+#include "psprecore/io/bytes.hpp"
 #include "psprecore/cli.hpp"
 #include "psprecore/formats/cooked.hpp"
 #include "psprecore/io/file.hpp"
@@ -75,7 +76,7 @@ nx::vector<nx::string> lines(const nx::string& path) {
 }
 
 // A fast key for kSignature bytes (exact matches are checked afterwards).
-std::uint64_t key(const std::byte* p) {
+std::uint64_t key(const u8* p) {
     std::uint64_t w[4];
     std::memcpy(w, p, sizeof w);
     std::uint64_t h = 0x9E3779B97F4A7C15ull;
@@ -87,7 +88,7 @@ struct Texture {
     nx::string hash;
     int width = 0, height = 0;
     bool two_d = false;
-    nx::vector<std::byte> texels;
+    nx::vector<u8> texels;
     std::size_t signature = 0;  // offset of the bytes looked for (16-aligned, not all alike)
     bool searchable = false;
     // Where it was found.
@@ -97,7 +98,7 @@ struct Texture {
 };
 
 // Each resource's start in an Atel module, for naming where a texture lives.
-nx::vector<std::uint64_t> resource_starts(std::span<const std::byte> file) {
+nx::vector<std::uint64_t> resource_starts(std::span<const u8> file) {
     nx::vector<std::uint64_t> starts;
     try {
         const atel::Module m = atel::parse(file);
@@ -153,7 +154,7 @@ int unpack(const nx::string& collection, const nx::string& game, const nx::strin
         Texture t{nx::string(cols[0]), std::atoi(nx::string(cols[1]).c_str()), std::atoi(nx::string(cols[2]).c_str()),
                   cols[4] == "2d"};
         try {
-            t.texels = io::read_all(path_join(collection, t.hash + ".texels"));
+            t.texels = io::to_vector(value_or_throw(io::read_file(path_join(collection, t.hash + ".texels"))));
         } catch (const std::exception&) {
         }
         for (std::size_t at = 0; at + kSignature <= t.texels.size(); at += 16) {
@@ -176,7 +177,7 @@ int unpack(const nx::string& collection, const nx::string& game, const nx::strin
     pkg::Reader reader(pkg::locate(game));
     nx::vector<nx::string> folder(reader.size());
     for (std::size_t e = 0; e < reader.size(); ++e) {
-        const nx::vector<std::byte> file = reader.read(e);
+        const nx::vector<u8> file = reader.read(e);
         folder[e] = nx::format("{:05}{}", e, pkg::type_extension(pkg::sniff(std::span(file).first(std::min<std::size_t>(file.size(), 16)))));
         for (std::size_t at = 0; at + kSignature <= file.size(); at += 16) {
             const auto it = wanted.find(key(file.data() + at));
@@ -214,7 +215,7 @@ int unpack(const nx::string& collection, const nx::string& game, const nx::strin
             if (dir.ends_with(".atel")) {
                 auto it = resources.find(t.entry);
                 if (it == resources.end()) {
-                    const nx::vector<std::byte> file = reader.read(static_cast<std::size_t>(t.entry));
+                    const nx::vector<u8> file = reader.read(static_cast<std::size_t>(t.entry));
                     it = resources.emplace(t.entry, resource_starts(file)).first;
                 }
                 const auto& starts = it->second;
@@ -236,7 +237,7 @@ int unpack(const nx::string& collection, const nx::string& game, const nx::strin
             continue;
         }
         const std::uint64_t original =
-            cooked::fnv1a64(std::span(reinterpret_cast<const std::byte*>(pixels), static_cast<std::size_t>(w) * h * 4));
+            cooked::key_of(std::span(reinterpret_cast<const u8*>(pixels), static_cast<std::size_t>(w) * h * 4));
         stbi_image_free(pixels);
         if (!index.pictures.insert(Index::picture(nx::format("{}", w), nx::format("{}", h), nx::format("{:016X}", original)))
                  .second) {
@@ -259,10 +260,10 @@ int unpack(const nx::string& collection, const nx::string& game, const nx::strin
 }
 
 // A texture of a model file's table, decoded: its RGBA8888 palette colours by texel, plain or swizzled.
-void decode(std::span<const std::byte> file, int w, int h, int bits, std::uint32_t palette, std::uint32_t texels,
+void decode(std::span<const u8> file, int w, int h, int bits, std::uint32_t palette, std::uint32_t texels,
             bool swizzled, nx::vector<std::uint32_t>& out) {
     const std::size_t pitch = static_cast<std::size_t>(w) * static_cast<std::size_t>(bits) / 8;
-    const std::byte* src = file.data() + texels;
+    const u8* src = file.data() + texels;
     const auto colour = [&](unsigned i) {
         std::uint32_t c;
         std::memcpy(&c, file.data() + palette + i * 4, 4);
@@ -313,7 +314,7 @@ int extract(const nx::string& game, const nx::string& assets, const nx::string& 
     std::size_t tables = 0, added = 0, same_picture = 0, noise = 0, files = 0;
     nx::vector<std::uint32_t> plain, swizzled;
     for (std::size_t e = 0; e < reader.size(); ++e) {
-        const nx::vector<std::byte> file = reader.read(e);
+        const nx::vector<u8> file = reader.read(e);
         const nx::string folder = nx::format(
             "{:05}{}", e, pkg::type_extension(pkg::sniff(std::span(file).first(std::min<std::size_t>(file.size(), 16)))));
         if (!folder.ends_with(".bin")) continue;
@@ -348,7 +349,7 @@ int extract(const nx::string& game, const nx::string& assets, const nx::string& 
                 ++noise;
                 continue;
             }
-            const nx::string original = nx::format("{:016X}", cooked::fnv1a64(std::as_bytes(std::span(*px))));
+            const nx::string original = nx::format("{:016X}", cooked::key_of(psprecore::io::bytes_of(std::span(*px))));
             if (!index.pictures.insert(Index::picture(nx::format("{}", w), nx::format("{}", h), original)).second) {
                 ++same_picture;
                 continue;
@@ -356,7 +357,7 @@ int extract(const nx::string& game, const nx::string& assets, const nx::string& 
             // Its content hash: palette and texels (a collected texture's has the CLUT as the game loaded it instead;
             // replacements are found by picture either way).
             const nx::string hash =
-                nx::format("{:016X}", cooked::fnv1a64(std::span(file.data() + palette, texels - palette + size)));
+                nx::format("{:016X}", cooked::key_of(std::span(file.data() + palette, texels - palette + size)));
             const nx::string relative = nx::format("{}/{:06X}_{}.png", folder, texels, hash);
             const nx::string target = path_join(assets, relative);
             (void)nx::fs::create_directories(parent_path(target));

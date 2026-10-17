@@ -130,33 +130,33 @@ std::uint32_t operand_bytes(OperandKind kind) {
     return 0;
 }
 
-std::uint8_t byte_at(std::span<const std::byte> code, std::size_t at) {
-    if (at >= code.size()) throw FormatError("bytecode truncated at offset " + nx::format("{}", at));
-    return std::to_integer<std::uint8_t>(code[at]);
+std::uint8_t byte_at(std::span<const u8> code, std::size_t at) {
+    if (at >= code.size()) throw Exception("bytecode truncated at offset " + nx::format("{}", at));
+    return static_cast<std::uint8_t>(code[at]);
 }
 
-std::uint32_t be32(std::span<const std::byte> code, std::size_t at) {
+std::uint32_t be32(std::span<const u8> code, std::size_t at) {
     return std::uint32_t{byte_at(code, at)} << 24 | std::uint32_t{byte_at(code, at + 1)} << 16 |
            std::uint32_t{byte_at(code, at + 2)} << 8 | byte_at(code, at + 3);
 }
 
-std::uint16_t be16(std::span<const std::byte> code, std::size_t at) {
+std::uint16_t be16(std::span<const u8> code, std::size_t at) {
     return static_cast<std::uint16_t>(byte_at(code, at) << 8 | byte_at(code, at + 1));
 }
 
-void put_be16(nx::vector<std::byte>& out, std::uint16_t v) {
-    out.push_back(static_cast<std::byte>(v >> 8));
-    out.push_back(static_cast<std::byte>(v));
+void put_be16(nx::vector<u8>& out, std::uint16_t v) {
+    out.push_back(static_cast<u8>(v >> 8));
+    out.push_back(static_cast<u8>(v));
 }
 
-void put_be32(nx::vector<std::byte>& out, std::uint32_t v) {
-    for (int shift = 24; shift >= 0; shift -= 8) out.push_back(static_cast<std::byte>(v >> shift));
+void put_be32(nx::vector<u8>& out, std::uint32_t v) {
+    for (int shift = 24; shift >= 0; shift -= 8) out.push_back(static_cast<u8>(v >> shift));
 }
 
 }  // namespace
 
 const OpcodeInfo& opcode_info(std::uint8_t opcode) {
-    if (opcode >= kOpcodeCount) throw FormatError("invalid script opcode " + nx::format("{}", opcode));
+    if (opcode >= kOpcodeCount) throw Exception("invalid script opcode " + nx::format("{}", opcode));
     return kOpcodes[opcode];
 }
 
@@ -166,16 +166,16 @@ std::optional<std::uint8_t> opcode_from_mnemonic(nx::string_view mnemonic) {
     return std::nullopt;
 }
 
-std::uint32_t instruction_length(std::span<const std::byte> code, std::size_t offset) {
+std::uint32_t instruction_length(std::span<const u8> code, std::size_t offset) {
     const auto op = byte_at(code, offset);
     const auto& info = opcode_info(op);
     std::uint32_t length = 1 + operand_bytes(info.operand);
     if (info.operand == K::NativeCall) length += 2u * byte_at(code, offset + 6);
-    if (offset + length > code.size()) throw FormatError("bytecode truncated at offset " + nx::format("{}", offset));
+    if (offset + length > code.size()) throw Exception("bytecode truncated at offset " + nx::format("{}", offset));
     return length;
 }
 
-Instruction decode(std::span<const std::byte> code, std::size_t offset) {
+Instruction decode(std::span<const u8> code, std::size_t offset) {
     Instruction insn;
     insn.offset = static_cast<std::uint32_t>(offset);
     insn.length = instruction_length(code, offset);
@@ -203,7 +203,7 @@ Instruction decode(std::span<const std::byte> code, std::size_t offset) {
     return insn;
 }
 
-nx::vector<Instruction> decode_all(std::span<const std::byte> code) {
+nx::vector<Instruction> decode_all(std::span<const u8> code) {
     nx::vector<Instruction> out;
     for (std::size_t pc = 0; pc < code.size();) {
         out.push_back(decode(code, pc));
@@ -212,21 +212,21 @@ nx::vector<Instruction> decode_all(std::span<const std::byte> code) {
     return out;
 }
 
-void encode(const Instruction& insn, nx::vector<std::byte>& out) {
-    out.push_back(static_cast<std::byte>(insn.opcode));
+void encode(const Instruction& insn, nx::vector<u8>& out) {
+    out.push_back(static_cast<u8>(insn.opcode));
     switch (opcode_info(insn.opcode).operand) {
         case K::None: break;
-        case K::I8: out.push_back(static_cast<std::byte>(insn.imm)); break;
+        case K::I8: out.push_back(static_cast<u8>(insn.imm)); break;
         case K::I16: put_be16(out, static_cast<std::uint16_t>(insn.imm)); break;
         case K::I32:
         case K::Name:
         case K::Code: put_be32(out, static_cast<std::uint32_t>(insn.imm)); break;
         case K::F32: put_be32(out, std::bit_cast<std::uint32_t>(insn.fimm)); break;
         case K::NativeCall:
-            if (insn.call.types.size() > 0xFF) throw FormatError("native call has too many argument types");
+            if (insn.call.types.size() > 0xFF) throw Exception("native call has too many argument types");
             put_be32(out, insn.call.name);
-            out.push_back(static_cast<std::byte>(insn.call.has_result));
-            out.push_back(static_cast<std::byte>(insn.call.types.size()));
+            out.push_back(static_cast<u8>(insn.call.has_result));
+            out.push_back(static_cast<u8>(insn.call.types.size()));
             put_be16(out, static_cast<std::uint16_t>(insn.call.pop_slots));
             for (auto t : insn.call.types) put_be16(out, t);
             break;

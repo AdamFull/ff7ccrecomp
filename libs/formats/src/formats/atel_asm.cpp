@@ -24,7 +24,7 @@ struct Line {
 };
 
 [[noreturn]] void fail(std::size_t line, const nx::string& what) {
-    throw FormatError("assembly line " + nx::format("{}", line) + ": " + what);
+    throw Exception("assembly line " + nx::format("{}", line) + ": " + what);
 }
 
 // Splits on whitespace and commas, keeping "..." literals (with escapes) and [...] lists intact.
@@ -129,7 +129,7 @@ bool is_hex_column(nx::string_view tok) {
 
 class Pool {
 public:
-    explicit Pool(nx::vector<std::byte>& names) : names_(names) {
+    explicit Pool(nx::vector<u8>& names) : names_(names) {
         for (std::size_t off = 0; off < names_.size();) {
             const auto* p = reinterpret_cast<const char*>(names_.data()) + off;
             const auto len = std::find(p, p + (names_.size() - off), '\0') - p;
@@ -141,14 +141,14 @@ public:
     std::uint32_t intern(const nx::string& s) {
         if (const auto it = first_.find(s); it != first_.end()) return it->second;
         const auto off = static_cast<std::uint32_t>(names_.size());
-        for (char c : s) names_.push_back(static_cast<std::byte>(c));
-        names_.push_back(std::byte{0});
+        for (char c : s) names_.push_back(static_cast<u8>(c));
+        names_.push_back(u8{0});
         first_.emplace(s, off);
         return off;
     }
 
 private:
-    nx::vector<std::byte>& names_;
+    nx::vector<u8>& names_;
     nx::map<nx::string, std::uint32_t> first_;
 };
 
@@ -227,7 +227,7 @@ void assemble_into(Module& module, nx::string_view listing) {
                 break;
             }
         }
-        nx::vector<std::byte> scratch;
+        nx::vector<u8> scratch;
         encode(p.insn, scratch);
         p.insn.offset = offset;
         offset += static_cast<std::uint32_t>(scratch.size());
@@ -235,7 +235,7 @@ void assemble_into(Module& module, nx::string_view listing) {
     }
 
     // Pass 2: resolve jump/call targets and encode.
-    nx::vector<std::byte> code;
+    nx::vector<u8> code;
     for (auto& p : program) {
         if (!p.target.empty()) {
             const auto it = labels.find(p.target);
@@ -251,8 +251,8 @@ void assemble_into(Module& module, nx::string_view listing) {
         for (auto& method : obj.methods) {
             const auto label = nx::string(module.name_at(obj.name)) + "." + nx::string(module.name_at(method.name));
             const auto it = labels.find(label);
-            if (it == labels.end()) throw FormatError("assembly has no label for method '" + label + "'");
-            if (it->second >= code.size()) throw FormatError("method label '" + label + "' is past the end of the code");
+            if (it == labels.end()) throw Exception("assembly has no label for method '" + label + "'");
+            if (it->second >= code.size()) throw Exception("method label '" + label + "' is past the end of the code");
             method.code_offset = it->second;
         }
     }

@@ -18,7 +18,7 @@ constexpr char kMagic[4] = {'A', 't', 'e', 'l'};
 
 class Cursor {
 public:
-    explicit Cursor(std::span<const std::byte> data) : data_(data) {}
+    explicit Cursor(std::span<const u8> data) : data_(data) {}
 
     std::size_t pos() const { return pos_; }
     void seek(std::size_t pos) {
@@ -35,9 +35,9 @@ public:
         return v;
     }
 
-    nx::vector<std::byte> bytes(std::size_t count) {
+    nx::vector<u8> bytes(std::size_t count) {
         require(pos_, count);
-        nx::vector<std::byte> out(data_.begin() + pos_, data_.begin() + pos_ + count);
+        nx::vector<u8> out(data_.begin() + pos_, data_.begin() + pos_ + count);
         pos_ += count;
         return out;
     }
@@ -45,10 +45,10 @@ public:
 private:
     void require(std::size_t at, std::size_t count) const {
         if (at > data_.size() || count > data_.size() - at)
-            throw FormatError("Atel module truncated at offset " + nx::format("{}", at));
+            throw Exception("Atel module truncated at offset " + nx::format("{}", at));
     }
 
-    std::span<const std::byte> data_;
+    std::span<const u8> data_;
     std::size_t pos_ = 0;
 };
 
@@ -57,51 +57,51 @@ public:
     template <typename T>
     void put_value(T v) {
         static_assert(std::is_integral_v<T>, "put_value writes a single little-endian integer");
-        const auto* p = reinterpret_cast<const std::byte*>(&v);
+        const auto* p = reinterpret_cast<const u8*>(&v);
         out_.insert(out_.end(), p, p + sizeof(T));
     }
-    void put_bytes(std::span<const std::byte> bytes) { out_.insert(out_.end(), bytes.begin(), bytes.end()); }
+    void put_bytes(std::span<const u8> bytes) { out_.insert(out_.end(), bytes.begin(), bytes.end()); }
     void zero_fill_to_multiple(std::size_t base, std::size_t alignment) {
-        while ((out_.size() - base) % alignment != 0) out_.push_back(std::byte{0});
+        while ((out_.size() - base) % alignment != 0) out_.push_back(u8{0});
     }
     void patch_u32(std::size_t at, std::uint32_t v) { std::memcpy(out_.data() + at, &v, sizeof v); }
     std::size_t size() const { return out_.size(); }
-    nx::vector<std::byte> take() { return std::move(out_); }
+    nx::vector<u8> take() { return std::move(out_); }
 
 private:
-    nx::vector<std::byte> out_;
+    nx::vector<u8> out_;
 };
 
 std::size_t align_up(std::size_t v, std::size_t a) { return (v + a - 1) / a * a; }
 
 std::uint32_t checked_u32(std::size_t v, const char* what) {
-    if (v > 0xFFFFFFFFu) throw FormatError(nx::string(what) + " exceeds 4 GiB");
+    if (v > 0xFFFFFFFFu) throw Exception(nx::string(what) + " exceeds 4 GiB");
     return static_cast<std::uint32_t>(v);
 }
 
 }  // namespace
 
 nx::string_view Module::name_at(std::uint32_t offset) const {
-    if (offset >= names.size()) throw FormatError("name offset " + nx::format("{}", offset) + " out of range");
+    if (offset >= names.size()) throw Exception("name offset " + nx::format("{}", offset) + " out of range");
     const auto* begin = reinterpret_cast<const char*>(names.data()) + offset;
     const auto* end = reinterpret_cast<const char*>(names.data()) + names.size();
     return nx::string_view(begin, static_cast<std::size_t>(std::find(begin, end, '\0') - begin));
 }
 
-bool is_atel(std::span<const std::byte> data) {
+bool is_atel(std::span<const u8> data) {
     return data.size() >= sizeof kMagic && std::memcmp(data.data(), kMagic, sizeof kMagic) == 0;
 }
 
-void crypt_names(std::span<std::byte> names, std::uint32_t seed) {
+void crypt_names(std::span<u8> names, std::uint32_t seed) {
     std::uint32_t state = seed;
     for (auto& b : names) {
         state = state * 0x41C64E6Du + 1234u;
-        b ^= static_cast<std::byte>((state >> 16) & 0xFF);
+        b ^= static_cast<u8>((state >> 16) & 0xFF);
     }
 }
 
-Module parse(std::span<const std::byte> data) {
-    if (!is_atel(data)) throw FormatError("not an Atel module (bad magic)");
+Module parse(std::span<const u8> data) {
+    if (!is_atel(data)) throw Exception("not an Atel module (bad magic)");
     Cursor in(data);
     in.seek(4);
 
@@ -111,14 +111,14 @@ Module parse(std::span<const std::byte> data) {
     m.reserved = in.read<std::uint8_t>();
     m.flags = in.read<std::uint8_t>();
     if (m.version_major != 1 || m.version_minor != 3)
-        throw FormatError("unsupported Atel version " + nx::format("{}", m.version_major) + "." +
+        throw Exception("unsupported Atel version " + nx::format("{}", m.version_major) + "." +
                           nx::format("{}", m.version_minor));
     const auto object_count = in.read<std::uint32_t>();
     const auto names_size = in.read<std::uint32_t>();
     const auto code_size = in.read<std::uint32_t>();
     m.seed = in.read<std::uint32_t>();
 
-    if (object_count > data.size() / 12) throw FormatError("implausible Atel object count");
+    if (object_count > data.size() / 12) throw Exception("implausible Atel object count");
     m.objects.resize(object_count);
     for (auto& obj : m.objects) {
         const auto method_count = in.read<std::uint16_t>();
@@ -140,8 +140,8 @@ Module parse(std::span<const std::byte> data) {
     m.code_padding = in.bytes(table - in.pos());
 
     const auto resource_count = in.read<std::uint32_t>();
-    if (in.read<std::uint32_t>() != resource_count) throw FormatError("Atel resource counts disagree");
-    if (resource_count > data.size() / 8) throw FormatError("implausible Atel resource count");
+    if (in.read<std::uint32_t>() != resource_count) throw Exception("Atel resource counts disagree");
+    if (resource_count > data.size() / 8) throw Exception("implausible Atel resource count");
     struct Span {
         std::uint32_t offset, size;
     };
@@ -158,7 +158,7 @@ Module parse(std::span<const std::byte> data) {
         const std::size_t end = begin + spans[i].size;
         const std::size_t next = i + 1 < resource_count ? base + spans[i + 1].offset : data.size();
         if (spans[i].offset % kResourceAlignment != 0 || end > next || next > data.size())
-            throw FormatError("Atel resource " + nx::format("{}", i) + " has an invalid offset or size");
+            throw Exception("Atel resource " + nx::format("{}", i) + " has an invalid offset or size");
         in.seek(begin);
         m.resources[i].data = in.bytes(spans[i].size);
         m.resources[i].slack = in.bytes(next - end);
@@ -168,15 +168,15 @@ Module parse(std::span<const std::byte> data) {
         (void)m.name_at(obj.name);
         for (const auto& method : obj.methods) {
             (void)m.name_at(method.name);
-            if (method.code_offset >= m.code.size()) throw FormatError("Atel method entry point out of range");
+            if (method.code_offset >= m.code.size()) throw Exception("Atel method entry point out of range");
         }
     }
     return m;
 }
 
-nx::vector<std::byte> serialize(const Module& m) {
+nx::vector<u8> serialize(const Module& m) {
     Builder out;
-    out.put_bytes(std::span(reinterpret_cast<const std::byte*>(kMagic), sizeof kMagic));
+    out.put_bytes(std::span(reinterpret_cast<const u8*>(kMagic), sizeof kMagic));
     out.put_value(m.version_major);
     out.put_value(m.version_minor);
     out.put_value(m.reserved);
@@ -187,7 +187,7 @@ nx::vector<std::byte> serialize(const Module& m) {
     out.put_value(m.seed);
 
     for (const auto& obj : m.objects) {
-        if (obj.methods.size() > 0xFFFF) throw FormatError("too many methods in one Atel object");
+        if (obj.methods.size() > 0xFFFF) throw Exception("too many methods in one Atel object");
         out.put_value(static_cast<std::uint16_t>(obj.methods.size()));
         out.put_value(obj.attributes);
         out.put_value(obj.name);
@@ -198,7 +198,7 @@ nx::vector<std::byte> serialize(const Module& m) {
         }
     }
 
-    nx::vector<std::byte> names = m.names;
+    nx::vector<u8> names = m.names;
     if (!(m.flags & kFlagPlainNames)) crypt_names(names, m.seed);
     out.put_bytes(names);
     out.put_bytes(m.code);
@@ -231,7 +231,7 @@ nx::vector<std::byte> serialize(const Module& m) {
     return out.take();
 }
 
-nx::string_view resource_type(std::span<const std::byte> data) {
+nx::string_view resource_type(std::span<const u8> data) {
     struct Tag {
         nx::string_view magic, type;
     };
@@ -242,15 +242,15 @@ nx::string_view resource_type(std::span<const std::byte> data) {
     return "bin";
 }
 
-nx::vector<std::byte> replace_resources(std::span<const std::byte> module,
-                                         const nx::map<std::size_t, nx::vector<std::byte>>& replacements) {
+nx::vector<u8> replace_resources(std::span<const u8> module,
+                                         const nx::map<std::size_t, nx::vector<u8>>& replacements) {
     const Module m = parse(module);  // validates the layout
     std::size_t table = kHeaderSize;
     for (const auto& obj : m.objects) table += 12 + 8 * obj.methods.size();
     table = align_up(table + m.names.size() + m.code.size(), kResourceAlignment);
     const std::size_t count = m.resources.size(), base = table + 8 + 8 * count;
 
-    nx::vector<std::byte> out(module.begin(), module.end());
+    nx::vector<u8> out(module.begin(), module.end());
     const auto read32 = [&](std::size_t at) {
         std::uint32_t v;
         std::memcpy(&v, out.data() + at, 4);
@@ -268,7 +268,7 @@ nx::vector<std::byte> replace_resources(std::span<const std::byte> module,
         if (data.size() <= space) {
             std::memcpy(out.data() + base + offset, data.data(), data.size());
             std::fill(out.begin() + static_cast<std::ptrdiff_t>(base + offset + data.size()),
-                      out.begin() + static_cast<std::ptrdiff_t>(base + offset + space), std::byte{0});
+                      out.begin() + static_cast<std::ptrdiff_t>(base + offset + space), u8{0});
         } else {
             out.resize(align_up(out.size(), kResourceAlignment));
             write32(entry, out.size() - base);

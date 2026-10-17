@@ -33,7 +33,7 @@ void collect_mod_glyphs(std::span<const nx::string> mods) {
         if (!is_file(path)) continue;
         const auto text = nx::fs::file_read_text(path);
         try {
-            if (!text.has_value()) throw IoError("unreadable");
+            if (!text.has_value()) throw Exception("unreadable");
             for (const auto& g : font::parse_glyphs(text.value())) g_advances[g.index] = g.advance;
         } catch (const std::exception& e) {
             std::fprintf(stderr, "mods: %s: %s\n", path.c_str(), e.what());

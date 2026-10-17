@@ -11,15 +11,15 @@ namespace ff7cc::font {
 
 namespace {
 
-std::uint32_t read32(std::span<const std::byte> d, std::size_t at) {
-    if (at + 4 > d.size()) throw FormatError("font: truncated");
+std::uint32_t read32(std::span<const u8> d, std::size_t at) {
+    if (at + 4 > d.size()) throw Exception("font: truncated");
     std::uint32_t v;
     std::memcpy(&v, d.data() + at, 4);
     return v;
 }
 
-std::uint16_t read16(std::span<const std::byte> d, std::size_t at) {
-    if (at + 2 > d.size()) throw FormatError("font: truncated");
+std::uint16_t read16(std::span<const u8> d, std::size_t at) {
+    if (at + 2 > d.size()) throw Exception("font: truncated");
     std::uint16_t v;
     std::memcpy(&v, d.data() + at, 2);
     return v;
@@ -34,20 +34,20 @@ std::size_t swizzled_offset(int byte_x, int y, int row_bytes) {
 
 }  // namespace
 
-nx::vector<Item> items(std::span<const std::byte> file) {
+nx::vector<Item> items(std::span<const u8> file) {
     const std::uint32_t count = read32(file, 0);
-    if (count == 0 || count > 256) throw FormatError("font: not a font file");
+    if (count == 0 || count > 256) throw Exception("font: not a font file");
     nx::vector<Item> out;
     for (std::uint32_t i = 0; i < count; ++i) {
         Item item{read32(file, 4 + 8 * i), read32(file, 8 + 8 * i)};
-        if (item.offset + item.size > file.size()) throw FormatError("font: item past the end of the file");
+        if (item.offset + item.size > file.size()) throw Exception("font: item past the end of the file");
         out.push_back(item);
     }
     return out;
 }
 
-Picture picture(std::span<const std::byte> file, const Item& item) {
-    if (item.size < 16 || std::memcmp(file.data() + item.offset, "IMG", 4) != 0) throw FormatError("font: not a picture");
+Picture picture(std::span<const u8> file, const Item& item) {
+    if (item.size < 16 || std::memcmp(file.data() + item.offset, "IMG", 4) != 0) throw Exception("font: not a picture");
     Picture p;
     p.width = read16(file, item.offset + 4);
     p.height = read16(file, item.offset + 6);
@@ -57,18 +57,18 @@ Picture picture(std::span<const std::byte> file, const Item& item) {
     p.texels = item.offset + 16;
     if (p.colours != 16 || p.texels + p.bytes > file.size() ||
         p.bytes != static_cast<std::size_t>(p.buffer_width) * static_cast<std::size_t>(p.height) / 2)
-        throw FormatError("font: unsupported picture (only 4-bit swizzled sheets)");
+        throw Exception("font: unsupported picture (only 4-bit swizzled sheets)");
     return p;
 }
 
-nx::vector<std::uint32_t> palette(std::span<const std::byte> file, const Item& item) {
-    if (item.size != 64) throw FormatError("font: not a palette");
+nx::vector<std::uint32_t> palette(std::span<const u8> file, const Item& item) {
+    if (item.size != 64) throw Exception("font: not a palette");
     nx::vector<std::uint32_t> colours(16);
     std::memcpy(colours.data(), file.data() + item.offset, 64);
     return colours;
 }
 
-nx::vector<std::uint8_t> unswizzle4(std::span<const std::byte> texels, int width, int height) {
+nx::vector<std::uint8_t> unswizzle4(std::span<const u8> texels, int width, int height) {
     const int row_bytes = width / 2;
     nx::vector<std::uint8_t> out(static_cast<std::size_t>(width) * static_cast<std::size_t>(height));
     for (int y = 0; y < height; ++y)
@@ -80,13 +80,13 @@ nx::vector<std::uint8_t> unswizzle4(std::span<const std::byte> texels, int width
     return out;
 }
 
-void swizzle4(std::span<const std::uint8_t> indices, int width, int height, std::span<std::byte> texels) {
+void swizzle4(std::span<const std::uint8_t> indices, int width, int height, std::span<u8> texels) {
     const int row_bytes = width / 2;
     for (int y = 0; y < height; ++y)
         for (int bx = 0; bx < row_bytes; ++bx) {
             const std::uint8_t lo = indices[static_cast<std::size_t>(y * width + bx * 2)] & 15;
             const std::uint8_t hi = indices[static_cast<std::size_t>(y * width + bx * 2 + 1)] & 15;
-            texels[swizzled_offset(bx, y, row_bytes)] = static_cast<std::byte>(lo | (hi << 4));
+            texels[swizzled_offset(bx, y, row_bytes)] = static_cast<u8>(lo | (hi << 4));
         }
 }
 
@@ -104,7 +104,7 @@ nx::vector<ExtraGlyph> parse_glyphs(nx::string_view text) {
         while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) line.remove_prefix(1);
         if (line.empty()) continue;
         const auto fail = [&](const char* why) {
-            throw FormatError(nx::format("glyphs.txt line {}: {}", line_number, why));
+            throw Exception(nx::format("glyphs.txt line {}: {}", line_number, why));
         };
         // <index> <character> <advance>
         const std::size_t a = line.find_first_of(" \t");

@@ -33,8 +33,8 @@ struct Range {
 Range parse_range(nx::string_view text, std::size_t count) {
     const auto dash = text.find('-');
     try {
-        const std::size_t a = parse_u64(text.substr(0, dash));
-        const std::size_t b = dash == nx::string_view::npos ? a : parse_u64(text.substr(dash + 1));
+        const std::size_t a = value_or_throw(parse_u64(text.substr(0, dash)));
+        const std::size_t b = dash == nx::string_view::npos ? a : value_or_throw(parse_u64(text.substr(dash + 1)));
         if (a > b || b >= count) throw Error("");
         return Range{a, b};
     } catch (const std::exception&) {
@@ -56,7 +56,7 @@ nx::string human_size(std::uint64_t bytes) {
 
 void make_directories(nx::fs::path_view dir) {
     if (!nx::fs::create_directories(dir))
-        throw IoError(nx::string("cannot create directory '") + dir.native() + "'");
+        throw Exception(nx::string("cannot create directory '") + dir.native() + "'");
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -121,7 +121,7 @@ int cmd_extract(nx::fs::path_view game, nx::fs::path_view out, std::optional<nx:
             std::fprintf(stderr, "  %zu / %zu files\n", i - range.first + 1, range.last - range.first + 1);
     }
     if (!nx::fs::file_write_text(path_join(out.native(), kManifestName), manifest))
-        throw IoError(nx::string("cannot write manifest in '") + out.native() + "'");
+        throw Exception(nx::string("cannot write manifest in '") + out.native() + "'");
     std::printf("extracted %zu entries (%s) to %s\n", range.last - range.first + 1, human_size(total).c_str(),
                 nx::string(out.native()).c_str());
     return 0;
@@ -129,7 +129,7 @@ int cmd_extract(nx::fs::path_view game, nx::fs::path_view out, std::optional<nx:
 
 int cmd_pack(nx::fs::path_view extracted, nx::fs::path_view out) {
     const auto manifest = nx::fs::file_read_text(path_join(extracted.native(), kManifestName));
-    if (!manifest) throw IoError(nx::string("no ") + kManifestName + " in '" + extracted.native() + "'");
+    if (!manifest) throw Exception(nx::string("no ") + kManifestName + " in '" + extracted.native() + "'");
 
     struct Row {
         std::size_t index;
@@ -153,15 +153,15 @@ int cmd_pack(nx::fs::path_view extracted, nx::fs::path_view out) {
         const std::size_t t2 = t1 == nx::string_view::npos ? t1 : line.find('\t', t1 + 1);
         const std::size_t t3 = t2 == nx::string_view::npos ? t2 : line.find('\t', t2 + 1);
         if (t3 == nx::string_view::npos || t3 + 1 == line.size())
-            throw FormatError("manifest line " + nx::format("{}", line_no) + ": expected 4 tab-separated fields");
-        rows.push_back(Row{parse_u64(line.substr(0, t1)), nx::string(line.substr(t3 + 1))});
+            throw Exception("manifest line " + nx::format("{}", line_no) + ": expected 4 tab-separated fields");
+        rows.push_back(Row{value_or_throw(parse_u64(line.substr(0, t1))), nx::string(line.substr(t3 + 1))});
     }
-    if (!header_seen) throw FormatError(nx::string("manifest is missing the '") + kManifestHeader + "' header");
+    if (!header_seen) throw Exception(nx::string("manifest is missing the '") + kManifestHeader + "' header");
 
     std::sort(rows.begin(), rows.end(), [](const Row& a, const Row& b) { return a.index < b.index; });
     for (std::size_t i = 0; i < rows.size(); ++i)
         if (rows[i].index != i)
-            throw FormatError("manifest must list every index from 0 with no gaps (missing or duplicate " +
+            throw Exception("manifest must list every index from 0 with no gaps (missing or duplicate " +
                               nx::format("{}", i) + "); extract the full archive before packing");
 
     make_directories(out);
@@ -186,7 +186,7 @@ int cmd_verify(nx::fs::path_view a_dir, nx::fs::path_view b_dir) {
     }
 
     constexpr std::size_t kChunk = 1 << 20;
-    nx::vector<std::byte> buf_a(kChunk), buf_b(kChunk);
+    nx::vector<u8> buf_a(kChunk), buf_b(kChunk);
     std::size_t differences = 0;
     for (std::size_t i = 0; i < a.size(); ++i) {
         const auto size = a.entry(i).size;

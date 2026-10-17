@@ -15,8 +15,8 @@ using namespace std::string_view_literals;
 
 namespace {
 
-nx::vector<std::byte> bytes(nx::string_view text) {
-    nx::vector<std::byte> out(text.size());
+nx::vector<u8> bytes(nx::string_view text) {
+    nx::vector<u8> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
 }
@@ -84,7 +84,7 @@ TEST_CASE("atel asm: errors carry line numbers and leave the module untouched") 
         try {
             atel::assemble_into(m, listing);
             CHECK(!"expected FormatError");
-        } catch (const FormatError& e) {
+        } catch (const Exception& e) {
             CHECK(nx::string(e.what()).find(needle) != nx::string::npos);
         }
         CHECK(m == before);

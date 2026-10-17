@@ -117,7 +117,7 @@ struct PoEntry {
 
 nx::vector<PoEntry> read_po(nx::fs::path_view path) {
     const auto file = nx::fs::file_read_text(path);
-    if (!file) throw IoError(nx::string("cannot read ") + path.native());
+    if (!file) throw Exception(nx::string("cannot read ") + path.native());
     nx::vector<PoEntry> out;
     PoEntry cur;
     nx::string* field = nullptr;
@@ -129,7 +129,7 @@ nx::vector<PoEntry> read_po(nx::fs::path_view path) {
     const auto quoted = [](nx::string_view line) {
         const auto a = line.find('"'), b = line.rfind('"');
         if (a == nx::string_view::npos || b <= a)
-            throw FormatError(nx::string("PO: expected a quoted string: ") + line);
+            throw Exception(nx::string("PO: expected a quoted string: ") + line);
         return po_unescape(line.substr(a + 1, b - a - 1));
     };
     const nx::string_view text = file.value();
@@ -179,7 +179,7 @@ int export_po(nx::fs::path_view game, nx::fs::path_view out_path) {
             ++messages;
         }
     });
-    if (!nx::fs::file_write_text(out_path, out)) throw IoError(nx::string("cannot write ") + out_path.native());
+    if (!nx::fs::file_write_text(out_path, out)) throw Exception(nx::string("cannot write ") + out_path.native());
     std::fprintf(stderr, "%zu messages from %zu tables -> %s\n", messages, tables, nx::string(out_path.native()).c_str());
     return 0;
 }
@@ -214,7 +214,7 @@ mbd::Charset mod_charset(nx::fs::path_view mod_dir) {
     const nx::string path = path_join(mod_dir.native(), "font/glyphs.txt");
     if (!is_file(path)) return charset;
     const auto text = nx::fs::file_read_text(path);
-    if (!text.has_value()) throw IoError("cannot read '" + path + "'");
+    if (!text.has_value()) throw Exception("cannot read '" + path + "'");
     for (const auto& g : font::parse_glyphs(text.value())) charset.glyphs[static_cast<std::size_t>(g.index)] = g.text;
     std::fprintf(stderr, "characters from %s\n", path.c_str());
     return charset;
@@ -223,7 +223,7 @@ mbd::Charset mod_charset(nx::fs::path_view mod_dir) {
 // ---- the font sheet --------------------------------------------------------------------------------------------
 
 struct FontFile {
-    nx::vector<std::byte> data;
+    nx::vector<u8> data;
     font::Picture sheet;
     nx::vector<std::uint32_t> palette;
 };
@@ -233,7 +233,7 @@ FontFile read_font(nx::fs::path_view game) {
     FontFile f;
     f.data = reader.read(font::kFontEntry);
     const auto items = font::items(f.data);
-    if (items.size() <= font::kTextPalette) throw FormatError("font: unexpected layout");
+    if (items.size() <= font::kTextPalette) throw Exception("font: unexpected layout");
     f.sheet = font::picture(f.data, items[font::kRegularSheet]);
     f.palette = font::palette(f.data, items[font::kTextPalette]);
     return f;
@@ -245,7 +245,7 @@ int font_export(nx::fs::path_view game, const nx::string& png) {
                                           f.sheet.height);
     nx::vector<std::uint32_t> rgba(indices.size());
     for (std::size_t i = 0; i < indices.size(); ++i) rgba[i] = f.palette[indices[i]];
-    if (!cctext::write_png(png, rgba.data(), f.sheet.width, f.sheet.height)) throw IoError("cannot write '" + png + "'");
+    if (!cctext::write_png(png, rgba.data(), f.sheet.width, f.sheet.height)) throw Exception("cannot write '" + png + "'");
     std::fprintf(stderr, "%dx%d sheet -> %s (cells %dx%d, %d to a row; free: glyphs 96-113, 228-341)\n", f.sheet.width,
                  f.sheet.height, png.c_str(), font::kCellWidth, font::kCellHeight, font::kColumns);
     return 0;
@@ -257,9 +257,9 @@ int font_import(nx::fs::path_view game, const nx::string& png, nx::fs::path_view
     FontFile f = read_font(game);
     nx::vector<std::uint32_t> rgba;
     int w = 0, h = 0;
-    if (!cctext::read_png(png, rgba, w, h)) throw IoError("cannot read '" + png + "'");
+    if (!cctext::read_png(png, rgba, w, h)) throw Exception("cannot read '" + png + "'");
     if (w != f.sheet.width || h != f.sheet.height)
-        throw FormatError(nx::format("the picture must be {}x{} like the sheet", f.sheet.width, f.sheet.height));
+        throw Exception(nx::format("the picture must be {}x{} like the sheet", f.sheet.width, f.sheet.height));
     const auto channel = [](std::uint32_t c, int i) { return static_cast<int>((c >> (i * 8)) & 0xFF); };
     nx::vector<std::uint8_t> indices(rgba.size());
     std::size_t inexact = 0;
@@ -282,10 +282,10 @@ int font_import(nx::fs::path_view game, const nx::string& png, nx::fs::path_view
     }
     font::swizzle4(indices, f.sheet.width, f.sheet.height, std::span(f.data).subspan(f.sheet.texels, f.sheet.bytes));
     const nx::string pkg_dir = path_join(mod_dir.native(), "pkg");
-    if (!nx::fs::create_directories(pkg_dir)) throw IoError("cannot create directory '" + pkg_dir + "'");
+    if (!nx::fs::create_directories(pkg_dir)) throw Exception("cannot create directory '" + pkg_dir + "'");
     char name[16];
     std::snprintf(name, sizeof name, "%05zu.bin", font::kFontEntry);
-    io::write_all(path_join(pkg_dir, name), f.data);
+    value_or_throw(io::write_file(path_join(pkg_dir, name), f.data));
     std::fprintf(stderr, "%s -> %s (%zu pixels not in the palette, mapped to the nearest colour)\n", png.c_str(),
                  path_join(pkg_dir, name).c_str(), inexact);
     return 0;
@@ -297,7 +297,7 @@ int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view m
     for (const auto& e : read_po(po_path)) {
         if (e.context.empty() || e.str.empty() || e.str == e.id) continue;
         const auto key = parse_key(e.context);
-        if (!key) throw FormatError("PO: bad msgctxt " + e.context);
+        if (!key) throw Exception("PO: bad msgctxt " + e.context);
         translated[*key] = e.str;
     }
     pkg::Reader reader(pkg::locate(game));
@@ -305,11 +305,11 @@ int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view m
     for (const auto& [k, s] : translated) by_entry[k.entry].emplace_back(k, s);
 
     const nx::string pkg_dir = path_join(mod_dir.native(), "pkg");
-    if (!nx::fs::create_directories(pkg_dir)) throw IoError("cannot create directory '" + pkg_dir + "'");
+    if (!nx::fs::create_directories(pkg_dir)) throw Exception("cannot create directory '" + pkg_dir + "'");
     std::size_t modules = 0, changed = 0, errors = 0;
     for (const auto& [entry, items] : by_entry) {
         if (entry >= reader.size() || reader.sniff(entry) != pkg::FileType::Atel)
-            throw FormatError("PO: entry " + nx::format("{}", entry) + " is not a script module");
+            throw Exception("PO: entry " + nx::format("{}", entry) + " is not a script module");
         const auto data = reader.read(entry);
         atel::Module module = atel::parse(data);
         // Scripts address messages and resources by offset: changed messages are patched in place (mbd::patch) and
@@ -317,22 +317,22 @@ int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view m
         nx::map<std::size_t, nx::map<std::size_t, mbd::Message>> changes;  // resource -> message -> content
         for (const auto& [k, text] : items) {
             if (k.resource >= module.resources.size() || !mbd::is_mbd(module.resources[k.resource].data))
-                throw FormatError("PO: " + key_string(k) + " is not a text table");
+                throw Exception("PO: " + key_string(k) + " is not a text table");
             const auto count = mbd::parse(module.resources[k.resource].data).size();
-            if (k.message >= count) throw FormatError("PO: " + key_string(k) + " is past the end of its table");
+            if (k.message >= count) throw Exception("PO: " + key_string(k) + " is past the end of its table");
             try {
                 changes[k.resource][k.message] = mbd::from_text(text, charset);
                 ++changed;
-            } catch (const FormatError& e) {
+            } catch (const Exception& e) {
                 ++errors;
                 std::fprintf(stderr, "%s: %s\n", key_string(k).c_str(), e.what());
             }
         }
-        nx::map<std::size_t, nx::vector<std::byte>> replacements;
+        nx::map<std::size_t, nx::vector<u8>> replacements;
         for (const auto& [r, messages] : changes) replacements[r] = mbd::patch(module.resources[r].data, messages);
         char name[16];
         std::snprintf(name, sizeof name, "%05zu.atel", entry);
-        io::write_all(path_join(pkg_dir, name), atel::replace_resources(data, replacements));
+        value_or_throw(io::write_file(path_join(pkg_dir, name), atel::replace_resources(data, replacements)));
         ++modules;
     }
     std::fprintf(stderr, "%zu messages changed in %zu modules -> %s (%zu errors)\n", changed, modules,
@@ -340,7 +340,7 @@ int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view m
     if (!language.empty()) {  // a language pack (psprecore/platform/mods.hpp)
         const nx::string ini = path_join(mod_dir.native(), "mod.ini");
         if (!nx::fs::file_write_text(ini, nx::format("name={} translation\nlanguage={}\n", language, language)).has_value())
-            throw IoError("cannot write '" + ini + "'");
+            throw Exception("cannot write '" + ini + "'");
         std::fprintf(stderr, "language pack: %s (%s)\n", language.c_str(), ini.c_str());
     }
     return errors ? 1 : 0;

@@ -37,8 +37,8 @@ struct Entry {
     friend bool operator==(const Entry&, const Entry&) = default;
 };
 
-nx::vector<Entry> parse_index(std::span<const std::byte> fse);
-nx::vector<std::byte> serialize_index(std::span<const Entry> entries);
+nx::vector<Entry> parse_index(std::span<const u8> fse);
+nx::vector<u8> serialize_index(std::span<const Entry> entries);
 
 // Throws FormatError if entries are out of order, overlap, or run past archive_size.
 void validate_index(std::span<const Entry> entries, std::uint64_t archive_size);
@@ -46,7 +46,7 @@ void validate_index(std::span<const Entry> entries, std::uint64_t archive_size);
 enum class FileType : std::uint8_t { Empty, Atel, Riff, Psmf, Sscf, Unknown };
 
 // Identifies a file from its first bytes (pass at least 16 when available).
-FileType sniff(std::span<const std::byte> head);
+FileType sniff(std::span<const u8> head);
 nx::string_view type_name(FileType type);       // e.g. "atel"
 nx::string_view type_extension(FileType type);  // e.g. ".atel"
 // Inverse of type_name(); returns Unknown for unrecognised names.
@@ -71,11 +71,11 @@ public:
     const Entry& entry(std::size_t index) const;
     std::uint64_t archive_size() const { return archive_size_; }
 
-    nx::vector<std::byte> read(std::size_t index);
+    nx::vector<u8> read(std::size_t index);
     // Reads min(out.size(), entry size) bytes from the start of the file; returns the count.
-    std::size_t read_head(std::size_t index, std::span<std::byte> out);
+    std::size_t read_head(std::size_t index, std::span<u8> out);
     // Reads exactly out.size() bytes starting `offset` bytes into the file.
-    void read_at(std::size_t index, std::uint64_t offset, std::span<std::byte> out);
+    void read_at(std::size_t index, std::uint64_t offset, std::span<u8> out);
     FileType sniff(std::size_t index);
     // Streams the file's contents to the current position of `out`.
     void copy_to(std::size_t index, io::File& out);
@@ -91,7 +91,7 @@ public:
     explicit Writer(const ArchivePaths& paths);
 
     // Appends the next file (index = number of files added so far).
-    void add(std::span<const std::byte> data);
+    void add(std::span<const u8> data);
     void add_from(io::File& src, std::uint64_t offset, std::uint64_t size);
     void add_file(nx::fs::path_view path);
     // Writes the index and closes both files. Must be called once all files are added.

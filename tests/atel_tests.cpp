@@ -12,8 +12,8 @@ using namespace std::string_view_literals;
 
 namespace {
 
-nx::vector<std::byte> bytes(nx::string_view text) {
-    nx::vector<std::byte> out(text.size());
+nx::vector<u8> bytes(nx::string_view text) {
+    nx::vector<u8> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
 }
@@ -70,7 +70,7 @@ TEST_CASE("atel serialize/parse round-trip") {
 TEST_CASE("atel names are stored encrypted unless flagged plain") {
     auto m = sample_module();
     const auto encrypted = atel::serialize(m);
-    const auto pos = [](const nx::vector<std::byte>& v) {
+    const auto pos = [](const nx::vector<u8>& v) {
         const auto r = bytes("Director");
         return std::search(v.begin(), v.end(), r.begin(), r.end()) != v.end();
     };
@@ -90,13 +90,13 @@ TEST_CASE("atel resources are 16-byte aligned after resizing") {
 }
 
 TEST_CASE("atel rejects malformed input") {
-    CHECK_THROWS_AS(atel::parse(bytes("Atex")), FormatError);
+    CHECK_THROWS_AS(atel::parse(bytes("Atex")), Exception);
     auto raw = atel::serialize(sample_module());
     raw.resize(30);
-    CHECK_THROWS_AS(atel::parse(raw), FormatError);
+    CHECK_THROWS_AS(atel::parse(raw), Exception);
     auto bad_entry = sample_module();
     bad_entry.objects[0].methods[0].code_offset = 999;
-    CHECK_THROWS_AS(atel::parse(atel::serialize(bad_entry)), FormatError);
+    CHECK_THROWS_AS(atel::parse(atel::serialize(bad_entry)), Exception);
 }
 
 TEST_CASE("atel resource type tags") {

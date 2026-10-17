@@ -63,14 +63,14 @@ struct Instruction {
 };
 
 // Length in bytes of the instruction at `offset`; throws FormatError if truncated or invalid.
-std::uint32_t instruction_length(std::span<const std::byte> code, std::size_t offset);
+std::uint32_t instruction_length(std::span<const u8> code, std::size_t offset);
 
-Instruction decode(std::span<const std::byte> code, std::size_t offset);
+Instruction decode(std::span<const u8> code, std::size_t offset);
 
 // Decodes the whole bytecode linearly. Throws FormatError on an invalid opcode or truncation.
-nx::vector<Instruction> decode_all(std::span<const std::byte> code);
+nx::vector<Instruction> decode_all(std::span<const u8> code);
 
 // Appends the encoding of `insn` (its opcode/operands; offset and length are ignored).
-void encode(const Instruction& insn, nx::vector<std::byte>& out);
+void encode(const Instruction& insn, nx::vector<u8>& out);
 
 }  // namespace ff7cc::atel

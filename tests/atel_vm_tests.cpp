@@ -14,8 +14,8 @@ using namespace std::string_view_literals;
 
 namespace {
 
-nx::vector<std::byte> bytes(nx::string_view text) {
-    nx::vector<std::byte> out(text.size());
+nx::vector<u8> bytes(nx::string_view text) {
+    nx::vector<u8> out(text.size());
     std::memcpy(out.data(), text.data(), text.size());
     return out;
 }
@@ -49,15 +49,15 @@ TEST_CASE("atel vm: decode/encode round-trip") {
     const auto code = bytes(
         "\x05\x07\x80\x08\x12\x34\x09\xff\xff\xff\xff\x0a\x40\x49\x0f\xdb\x0b\x00\x00\x00\x05"
         "\x29\x00\x00\x00\x09\x00\x01\xff\xfe\x00\x07\x25\x00\x00\x00\x00\x01"sv);
-    nx::vector<std::byte> out;
+    nx::vector<u8> out;
     for (const auto& insn : atel::decode_all(code)) atel::encode(insn, out);
     CHECK(out == code);
 }
 
 TEST_CASE("atel vm: invalid or truncated bytecode is rejected") {
-    CHECK_THROWS_AS(atel::decode(bytes("\x62"sv), 0), FormatError);
-    CHECK_THROWS_AS(atel::decode(bytes("\x09\x00\x00"sv), 0), FormatError);
-    CHECK_THROWS_AS(atel::decode_all(bytes("\x29\x00\x00\x00\x00\x00\x02\x00\x00\x00"sv)), FormatError);
+    CHECK_THROWS_AS(atel::decode(bytes("\x62"sv), 0), Exception);
+    CHECK_THROWS_AS(atel::decode(bytes("\x09\x00\x00"sv), 0), Exception);
+    CHECK_THROWS_AS(atel::decode_all(bytes("\x29\x00\x00\x00\x00\x00\x02\x00\x00\x00"sv)), Exception);
 }
 
 TEST_CASE("atel vm: mnemonics are unique and reversible") {

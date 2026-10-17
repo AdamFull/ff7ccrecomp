@@ -56,8 +56,8 @@ struct Object {
 };
 
 struct Resource {
-    nx::vector<std::byte> data;
-    nx::vector<std::byte> slack;  // bytes after `data` up to the next resource (or end of file)
+    nx::vector<u8> data;
+    nx::vector<u8> slack;  // bytes after `data` up to the next resource (or end of file)
 
     friend bool operator==(const Resource&, const Resource&) = default;
 };
@@ -69,9 +69,9 @@ struct Module {
     std::uint8_t flags = 0x02;
     std::uint32_t seed = 0;
     nx::vector<Object> objects;
-    nx::vector<std::byte> names;         // always decrypted in memory
-    nx::vector<std::byte> code;
-    nx::vector<std::byte> code_padding;  // filler between the code and the resource table
+    nx::vector<u8> names;         // always decrypted in memory
+    nx::vector<u8> code;
+    nx::vector<u8> code_padding;  // filler between the code and the resource table
     nx::vector<Resource> resources;
 
     // NUL-terminated string at `offset` in the name pool (Shift-JIS for non-ASCII text).
@@ -81,22 +81,22 @@ struct Module {
 };
 
 // True if `data` starts with the Atel magic.
-bool is_atel(std::span<const std::byte> data);
+bool is_atel(std::span<const u8> data);
 
-Module parse(std::span<const std::byte> data);
-nx::vector<std::byte> serialize(const Module& module);
+Module parse(std::span<const u8> data);
+nx::vector<u8> serialize(const Module& module);
 
 // Replaces resources while every other byte of the module stays where it was (the game may address resources by
 // their offsets): a replacement that fits in the old resource's space (its data and slack) is written in place,
 // a larger one is appended at the end of the module. Only the resource table entries of replaced resources change.
-nx::vector<std::byte> replace_resources(std::span<const std::byte> module,
-                                         const nx::map<std::size_t, nx::vector<std::byte>>& replacements);
+nx::vector<u8> replace_resources(std::span<const u8> module,
+                                         const nx::map<std::size_t, nx::vector<u8>>& replacements);
 
 // The name-table cipher (symmetric): XOR with the low byte of successive game-LCG outputs,
 // state = state * 0x41C64E6D + 1234, output = (state >> 16) & 0x7FFF, seeded with Module::seed.
-void crypt_names(std::span<std::byte> names, std::uint32_t seed);
+void crypt_names(std::span<u8> names, std::uint32_t seed);
 
 // Short type tag for a resource from its leading bytes (e.g. "mbd", "sscf"); "bin" if unknown.
-nx::string_view resource_type(std::span<const std::byte> data);
+nx::string_view resource_type(std::span<const u8> data);
 
 }  // namespace ff7cc::atel

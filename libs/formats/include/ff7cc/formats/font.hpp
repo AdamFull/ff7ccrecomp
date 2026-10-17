@@ -40,14 +40,14 @@ struct Picture {
     std::size_t texels = 0, bytes = 0;  // offset of the texels in the file, their size
 };
 
-nx::vector<Item> items(std::span<const std::byte> file);                     // throws FormatError
-Picture picture(std::span<const std::byte> file, const Item& item);         // throws FormatError if not a picture
+nx::vector<Item> items(std::span<const u8> file);                     // throws FormatError
+Picture picture(std::span<const u8> file, const Item& item);         // throws FormatError if not a picture
 // A palette item as RGBA8 colours (R in the low byte).
-nx::vector<std::uint32_t> palette(std::span<const std::byte> file, const Item& item);
+nx::vector<std::uint32_t> palette(std::span<const u8> file, const Item& item);
 
 // 4-bit swizzled texels <-> one palette index per texel, rows of `width`.
-nx::vector<std::uint8_t> unswizzle4(std::span<const std::byte> texels, int width, int height);
-void swizzle4(std::span<const std::uint8_t> indices, int width, int height, std::span<std::byte> texels);
+nx::vector<std::uint8_t> unswizzle4(std::span<const u8> texels, int width, int height);
+void swizzle4(std::span<const std::uint8_t> indices, int width, int height, std::span<u8> texels);
 
 struct ExtraGlyph {
     int index = 0;

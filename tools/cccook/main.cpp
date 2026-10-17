@@ -52,7 +52,7 @@ int run(const nx::string& command) {
 #endif
 }
 
-void write_file(nx::fs::path_view path, std::span<const std::byte> data) {
+void write_file(nx::fs::path_view path, std::span<const u8> data) {
     io::File f(path, io::File::Mode::Write);
     f.write(data);
 }
@@ -67,7 +67,7 @@ public:
     Cooker(const Options& options, nx::fs::path_view out)
         : opt_(options), out_(out.native()), tmp_(path_join(out_, "tmp")) {
         for (const nx::string& dir : {path_join(out_, "audio"), path_join(out_, "movies"), tmp_})
-            if (!nx::fs::create_directories(dir)) throw IoError("cannot create directory '" + dir + "'");
+            if (!nx::fs::create_directories(dir)) throw Exception("cannot create directory '" + dir + "'");
     }
 
     nx::string ffmpeg() const { return quote(opt_.ffmpeg) + " -hide_banner -loglevel error -nostdin -y"; }
@@ -75,7 +75,7 @@ public:
     // Writes `data` to a temporary input, runs FFmpeg with `args` between "-i input" and the output, and moves
     // the result into place. Retries a few times: freshly written files can be briefly locked on Windows
     // (e.g. by antivirus scanning).
-    bool transcode(nx::string_view name, std::span<const std::byte> data, nx::string_view input_args,
+    bool transcode(nx::string_view name, std::span<const u8> data, nx::string_view input_args,
                    nx::string_view output_args, nx::fs::path_view out) {
         const nx::string in = path_join(tmp_, name);
         const nx::string part = nx::string(out.native()) + ".part";
@@ -107,26 +107,27 @@ public:
     }
 
     // RIFF ATRAC -> Ogg Vorbis (the raw decoder timeline; the runtime applies delay and loops itself).
-    bool cook_audio(std::size_t entry, const nx::vector<std::byte>& file, std::uint64_t key) {
+    bool cook_audio(std::size_t entry, const nx::vector<u8>& file, std::uint64_t key) {
         return transcode(nx::format("a{}.at3", entry), file, "", vorbis_args(), cooked::audio_path(out_, key));
     }
 
     // PSMF -> AV1 video (one frame per access unit, in display order) + Ogg Vorbis audio.
-    bool cook_movie(std::size_t entry, const nx::vector<std::byte>& file, std::uint64_t key) {
-        psmf::Header header;
-        if (!psmf::parse_header(file, header)) return false;
+    bool cook_movie(std::size_t entry, const nx::vector<u8>& file, std::uint64_t key) {
+        const auto parsed = psmf::parse_header(file);
+        if (!parsed) return false;
+        const psmf::Header& header = *parsed;
         psmf::Demuxer demux;
-        nx::vector<std::byte> video, audio;
+        nx::vector<u8> video, audio;
         std::uint64_t index = 0;
         const auto drain = [&] {
             for (auto& u : demux.units(psmf::kVideo)) {
-                const auto* b = reinterpret_cast<const std::byte*>(u.data.data());
+                const auto* b = reinterpret_cast<const u8*>(u.data.data());
                 video.insert(video.end(), b, b + u.data.size());
             }
             demux.units(psmf::kVideo).clear();
             for (auto& u : demux.units(psmf::kAudio)) {
                 if (u.data.size() <= 8) continue;
-                const auto* b = reinterpret_cast<const std::byte*>(u.data.data());
+                const auto* b = reinterpret_cast<const u8*>(u.data.data());
                 audio.insert(audio.end(), b + 8, b + u.data.size());  // strip the 8-byte frame header
             }
             demux.units(psmf::kAudio).clear();
@@ -175,13 +176,14 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
     std::size_t embedded = 0;
     const auto scan_embedded = [&](std::size_t i) {
         const auto file = reader.read(i);
-        static constexpr std::byte kRiff[] = {std::byte{'R'}, std::byte{'I'}, std::byte{'F'}, std::byte{'F'}};
+        static constexpr u8 kRiff[] = {u8{'R'}, u8{'I'}, u8{'F'}, u8{'F'}};
         for (auto it = file.begin(); (it = std::search(it, file.end(), std::begin(kRiff), std::end(kRiff))) != file.end(); ++it) {
             const std::size_t at = static_cast<std::size_t>(it - file.begin());
-            atrac::Info info;
-            if (!atrac::parse(std::span(file).subspan(at), info)) continue;
+            const auto parsed = atrac::parse(std::span(file).subspan(at));
+            if (!parsed) continue;
+            const atrac::Info& info = *parsed;
             const std::size_t length = info.data_offset + info.data_size;
-            const std::uint64_t key = cooked::fnv1a64(std::span(file).subspan(at, length));
+            const std::uint64_t key = cooked::key_of(std::span(file).subspan(at, length));
             if (!seen.emplace(key, i).second) {
                 ++duplicates;
                 continue;
@@ -192,7 +194,7 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
             }
             ++audio_count;
             ++embedded;
-            nx::vector<std::byte> clip(it, it + static_cast<std::ptrdiff_t>(length));
+            nx::vector<u8> clip(it, it + static_cast<std::ptrdiff_t>(length));
             tasks.push_back({nx::format("audio {}+{}", i, at),
                              nx::unique_function<bool()>([&cooker, i, key, clip = std::move(clip)] {
                                  return cooker.cook_audio(i, clip, key);
@@ -200,7 +202,7 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
         }
     };
 
-    nx::vector<std::byte> head(2048);
+    nx::vector<u8> head(2048);
     for (std::size_t i = 0; i < reader.size(); ++i) {
         if (!opt.entries.empty() && std::find(opt.entries.begin(), opt.entries.end(), i) == opt.entries.end()) continue;
         const pkg::FileType type = reader.sniff(i);
@@ -215,12 +217,13 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
         std::uint64_t key = 0;
         if (is_movie) {
             const std::size_t n = reader.read_head(i, head);
-            key = cooked::fnv1a64(std::span(head).first(n));
+            key = cooked::key_of(std::span(head).first(n));
         } else {
             auto file = reader.read(i);
-            atrac::Info info;
-            if (!atrac::parse(file, info)) continue;
-            key = cooked::fnv1a64(std::span(file).first(info.data_offset + info.data_size));
+            const auto parsed = atrac::parse(file);
+            if (!parsed) continue;
+            const atrac::Info& info = *parsed;
+            key = cooked::key_of(std::span(file).first(info.data_offset + info.data_size));
         }
         if (const auto it = seen.find(key); it != seen.end()) {
             ++duplicates;
@@ -237,7 +240,7 @@ int cook(nx::fs::path_view game, nx::fs::path_view out_dir, const Options& opt) 
         (is_audio ? audio_count : movie_count)++;
         tasks.push_back({nx::format("{} {}", is_audio ? "audio" : "movie", i),
                          nx::unique_function<bool()>([&reader, &cooker, i, key, is_audio] {
-                             nx::vector<std::byte> file;
+                             nx::vector<u8> file;
                              {
                                  static nx::mutex m;  // one pkg file handle
                                  nx::scoped_lock lock(m);

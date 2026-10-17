@@ -12,15 +12,15 @@ namespace ff7cc::mbd {
 
 namespace {
 
-std::uint32_t read32(std::span<const std::byte> d, std::size_t at) {
-    if (at + 4 > d.size()) throw FormatError("MBD: truncated");
+std::uint32_t read32(std::span<const u8> d, std::size_t at) {
+    if (at + 4 > d.size()) throw Exception("MBD: truncated");
     std::uint32_t v;
     std::memcpy(&v, d.data() + at, 4);
     return v;
 }
 
-void put32(nx::vector<std::byte>& out, std::uint32_t v) {
-    const auto* b = reinterpret_cast<const std::byte*>(&v);
+void put32(nx::vector<u8>& out, std::uint32_t v) {
+    const auto* b = reinterpret_cast<const u8*>(&v);
     out.insert(out.end(), b, b + 4);
 }
 
@@ -32,38 +32,38 @@ nx::string hex(unsigned v, int digits) {
 }
 
 unsigned parse_number(nx::string_view s, int base) {
-    if (s.empty()) throw FormatError("MBD text: empty number in a tag");
+    if (s.empty()) throw Exception("MBD text: empty number in a tag");
     unsigned v = 0;
     for (const char c : s) {
         int d = -1;
         if (c >= '0' && c <= '9') d = c - '0';
         else if (base == 16 && c >= 'A' && c <= 'F') d = c - 'A' + 10;
         else if (base == 16 && c >= 'a' && c <= 'f') d = c - 'a' + 10;
-        if (d < 0) throw FormatError("MBD text: bad number '" + nx::string(s) + "' in a tag");
+        if (d < 0) throw Exception("MBD text: bad number '" + nx::string(s) + "' in a tag");
         v = v * static_cast<unsigned>(base) + static_cast<unsigned>(d);
-        if (v > 0xFFFF) throw FormatError("MBD text: number out of range in a tag");
+        if (v > 0xFFFF) throw Exception("MBD text: number out of range in a tag");
     }
     return v;
 }
 
 }  // namespace
 
-bool is_mbd(std::span<const std::byte> data) {
+bool is_mbd(std::span<const u8> data) {
     return data.size() >= 4 && std::memcmp(data.data(), "MBD\0", 4) == 0;
 }
 
-nx::vector<Message> parse(std::span<const std::byte> data) {
-    if (!is_mbd(data)) throw FormatError("MBD: bad magic");
+nx::vector<Message> parse(std::span<const u8> data) {
+    if (!is_mbd(data)) throw Exception("MBD: bad magic");
     nx::vector<Message> out;
     std::size_t p = 4;
     while (p < data.size()) {
         const std::uint32_t page_count = read32(data, p);
-        if (page_count == 0 || page_count > 64) throw FormatError("MBD: bad page count");
+        if (page_count == 0 || page_count > 64) throw Exception("MBD: bad page count");
         Message m;
         std::size_t expected = 4 + 8 * static_cast<std::size_t>(page_count), end = 0;
         for (std::uint32_t i = 0; i < page_count; ++i) {
             const std::uint32_t length = read32(data, p + 4 + 8 * i), offset = read32(data, p + 8 + 8 * i);
-            if (offset != expected) throw FormatError("MBD: pages are not contiguous");
+            if (offset != expected) throw Exception("MBD: pages are not contiguous");
             nx::vector<Token> page(length);
             for (std::uint32_t t = 0; t < length; ++t) {
                 const std::uint32_t w = read32(data, p + offset + 4 * t);
@@ -71,7 +71,7 @@ nx::vector<Message> parse(std::span<const std::byte> data) {
             }
             const std::uint8_t terminator = i + 1 == page_count ? kMessageEnd : kPageEnd;
             if (page.empty() || !page.back().is_control() || page.back().control() != terminator || page.back().arg != 0)
-                throw FormatError("MBD: page does not end with its terminator");
+                throw Exception("MBD: page does not end with its terminator");
             expected = offset + 4 * static_cast<std::size_t>(length);
             end = p + expected;
             m.pages.push_back(std::move(page));
@@ -79,13 +79,13 @@ nx::vector<Message> parse(std::span<const std::byte> data) {
         out.push_back(std::move(m));
         p = end;
     }
-    if (p != data.size()) throw FormatError("MBD: trailing bytes");
+    if (p != data.size()) throw Exception("MBD: trailing bytes");
     return out;
 }
 
-nx::vector<std::byte> serialize(const nx::vector<Message>& messages) {
-    nx::vector<std::byte> out;
-    for (const char c : {'M', 'B', 'D', '\0'}) out.push_back(static_cast<std::byte>(c));
+nx::vector<u8> serialize(const nx::vector<Message>& messages) {
+    nx::vector<u8> out;
+    for (const char c : {'M', 'B', 'D', '\0'}) out.push_back(static_cast<u8>(c));
     for (const auto& m : messages) {
         put32(out, static_cast<std::uint32_t>(m.pages.size()));
         std::uint32_t offset = 4 + 8 * static_cast<std::uint32_t>(m.pages.size());
@@ -100,7 +100,7 @@ nx::vector<std::byte> serialize(const nx::vector<Message>& messages) {
     return out;
 }
 
-nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<std::size_t, Message>& changes) {
+nx::vector<u8> patch(std::span<const u8> original, const nx::map<std::size_t, Message>& changes) {
     const auto messages = parse(original);
     // Start offset and size of every message in the original table.
     nx::vector<std::size_t> starts, sizes;
@@ -112,7 +112,7 @@ nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<s
         sizes.push_back(last_offset + 4 * static_cast<std::size_t>(last_length));
         p += sizes.back();
     }
-    nx::vector<std::byte> out(original.begin(), original.end());
+    nx::vector<u8> out(original.begin(), original.end());
     const auto set32 = [&](std::size_t at, std::size_t v) {
         const auto u = static_cast<std::uint32_t>(v);
         std::memcpy(out.data() + at, &u, 4);
@@ -125,22 +125,22 @@ nx::vector<std::byte> patch(std::span<const std::byte> original, const nx::map<s
         if (length <= space) {
             std::memcpy(out.data() + start, bytes.data() + 4, length);
             std::fill(out.begin() + static_cast<std::ptrdiff_t>(start + length),
-                      out.begin() + static_cast<std::ptrdiff_t>(start + space), std::byte{0});
+                      out.begin() + static_cast<std::ptrdiff_t>(start + space), u8{0});
             continue;
         }
         const std::size_t header = 4 + 8 * message.pages.size();
         if (header > space)
-            throw FormatError("MBD: message " + nx::format("{}", index) + " has too many pages for its original place (" +
+            throw Exception("MBD: message " + nx::format("{}", index) + " has too many pages for its original place (" +
                               nx::format("{}", message.pages.size()) + ")");
         std::fill(out.begin() + static_cast<std::ptrdiff_t>(start), out.begin() + static_cast<std::ptrdiff_t>(start + space),
-                  std::byte{0});
+                  u8{0});
         set32(start, message.pages.size());
         for (std::size_t pg = 0; pg < message.pages.size(); ++pg) {
             set32(start + 4 + 8 * pg, message.pages[pg].size());
             set32(start + 8 + 8 * pg, out.size() - start);  // the page data goes to the end of the table
             for (const Token& t : message.pages[pg]) {
                 const std::uint32_t w = static_cast<std::uint32_t>(t.code) | (static_cast<std::uint32_t>(t.arg) << 16);
-                const auto* b = reinterpret_cast<const std::byte*>(&w);
+                const auto* b = reinterpret_cast<const u8*>(&w);
                 out.insert(out.end(), b, b + 4);
             }
         }
@@ -212,7 +212,7 @@ Message from_text(nx::string_view text, const Charset& charset) {
         }
         if (text[i] == '{') {
             const std::size_t close = text.find('}', i);
-            if (close == nx::string_view::npos) throw FormatError("MBD text: unterminated tag");
+            if (close == nx::string_view::npos) throw Exception("MBD text: unterminated tag");
             const nx::string_view tag = text.substr(i + 1, close - i - 1);
             const std::size_t colon = tag.find(':');
             const nx::string_view name = tag.substr(0, colon);
@@ -230,11 +230,11 @@ Message from_text(nx::string_view text, const Charset& charset) {
                                                    static_cast<std::uint16_t>(value.empty() ? 0 : parse_number(value, 16))));
             } else if (name == "T") {
                 const std::size_t second = value.find(':');
-                if (second == nx::string_view::npos) throw FormatError("MBD text: bad {T:code:arg} tag");
+                if (second == nx::string_view::npos) throw Exception("MBD text: bad {T:code:arg} tag");
                 page.push_back({static_cast<std::uint16_t>(parse_number(value.substr(0, second), 16)),
                                 static_cast<std::uint16_t>(parse_number(value.substr(second + 1), 16))});
             } else {
-                throw FormatError("MBD text: unknown tag {" + nx::string(tag) + "}");
+                throw Exception("MBD text: unknown tag {" + nx::string(tag) + "}");
             }
             i = close + 1;
             continue;
@@ -250,7 +250,7 @@ Message from_text(nx::string_view text, const Charset& charset) {
         if (!matched) {
             std::size_t len = 1;  // report the whole UTF-8 character
             while (i + len < text.size() && (static_cast<unsigned char>(text[i + len]) & 0xC0) == 0x80) ++len;
-            throw FormatError("MBD text: the font has no glyph for '" + nx::string(text.substr(i, len)) + "'");
+            throw Exception("MBD text: the font has no glyph for '" + nx::string(text.substr(i, len)) + "'");
         }
     }
     m.pages.back().push_back(Token::make_control(kMessageEnd));
