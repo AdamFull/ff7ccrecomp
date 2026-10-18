@@ -27,16 +27,10 @@
 #include <cstring>
 #include <exception>
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_PNG
-#include <stb_image.h>
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define STBI_WRITE_NO_STDIO_DEPRECATION
-#include <stb_image_write.h>
-
 #include "psprecore/io/bytes.hpp"
 #include "psprecore/cli.hpp"
 #include "psprecore/formats/cooked.hpp"
+#include "psprecore/formats/png.hpp"
 #include "psprecore/io/file.hpp"
 #include "psprecore/io/path.hpp"
 #include "ff7cc/formats/atel.hpp"
@@ -230,15 +224,14 @@ int unpack(const nx::string& collection, const nx::string& game, const nx::strin
         }
         const nx::string relative = nx::format("{}/{:06X}_{}.png", dir, offset, t.hash);
         const nx::string target = path_join(assets, relative);
-        int w = 0, h = 0, channels = 0;
-        stbi_uc* pixels = stbi_load(path_join(collection, t.hash + ".png").c_str(), &w, &h, &channels, 4);
-        if (!pixels) {
+        const auto picture = psprecore::png::read(path_join(collection, t.hash + ".png"));
+        if (!picture) {
             std::fprintf(stderr, "%s: no picture in the collection\n", t.hash.c_str());
             continue;
         }
-        const std::uint64_t original =
-            cooked::key_of(std::span(reinterpret_cast<const u8*>(pixels), static_cast<std::size_t>(w) * h * 4));
-        stbi_image_free(pixels);
+        const int w = picture->w, h = picture->h;
+        const std::uint64_t original = cooked::key_of(
+            std::span(reinterpret_cast<const u8*>(picture->px.data()), static_cast<std::size_t>(w) * h * 4));
         if (!index.pictures.insert(Index::picture(nx::format("{}", w), nx::format("{}", h), nx::format("{:016X}", original)))
                  .second) {
             ++same_picture;
@@ -362,7 +355,7 @@ int extract(const nx::string& game, const nx::string& assets, const nx::string& 
             const nx::string target = path_join(assets, relative);
             (void)nx::fs::create_directories(parent_path(target));
             const auto save = [&](const nx::string& path) {
-                return nx::fs::exists(path) || stbi_write_png(path.c_str(), w, h, 4, px->data(), w * 4) != 0;
+                return nx::fs::exists(path) || psprecore::png::write(path, px->data(), w, h).has_value();
             };
             if (!save(target) || !save(path_join(collection, hash + ".png"))) {
                 std::fprintf(stderr, "cctex: cannot write %s\n", target.c_str());

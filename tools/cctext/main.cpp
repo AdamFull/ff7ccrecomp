@@ -18,6 +18,7 @@
 #include <optional>
 
 #include "psprecore/error.hpp"
+#include "psprecore/formats/png.hpp"
 #include "psprecore/cli.hpp"
 #include "ff7cc/formats/atel.hpp"
 #include "ff7cc/formats/font.hpp"
@@ -30,7 +31,6 @@
 #include "core/foundation/platform/filesystem.h"
 #include "core/foundation/strings/format.h"
 #include "core/foundation/strings/utf8_string.h"
-#include "png.hpp"
 
 using namespace ff7cc;
 
@@ -245,7 +245,8 @@ int font_export(nx::fs::path_view game, const nx::string& png) {
                                           f.sheet.height);
     nx::vector<std::uint32_t> rgba(indices.size());
     for (std::size_t i = 0; i < indices.size(); ++i) rgba[i] = f.palette[indices[i]];
-    if (!cctext::write_png(png, rgba.data(), f.sheet.width, f.sheet.height)) throw Exception("cannot write '" + png + "'");
+    if (const auto written = psprecore::png::write(png, rgba.data(), f.sheet.width, f.sheet.height); !written)
+        throw Exception(written.error());
     std::fprintf(stderr, "%dx%d sheet -> %s (cells %dx%d, %d to a row; free: glyphs 96-113, 228-341)\n", f.sheet.width,
                  f.sheet.height, png.c_str(), font::kCellWidth, font::kCellHeight, font::kColumns);
     return 0;
@@ -255,9 +256,10 @@ int font_export(nx::fs::path_view game, const nx::string& png) {
 // colours (copy them from existing glyphs).
 int font_import(nx::fs::path_view game, const nx::string& png, nx::fs::path_view mod_dir) {
     FontFile f = read_font(game);
-    nx::vector<std::uint32_t> rgba;
-    int w = 0, h = 0;
-    if (!cctext::read_png(png, rgba, w, h)) throw Exception("cannot read '" + png + "'");
+    auto picture = psprecore::png::read(png);
+    if (!picture) throw Exception(picture.error());
+    const nx::vector<u32> rgba = std::move(picture->px);
+    const int w = picture->w, h = picture->h;
     if (w != f.sheet.width || h != f.sheet.height)
         throw Exception(nx::format("the picture must be {}x{} like the sheet", f.sheet.width, f.sheet.height));
     const auto channel = [](std::uint32_t c, int i) { return static_cast<int>((c >> (i * 8)) & 0xFF); };
