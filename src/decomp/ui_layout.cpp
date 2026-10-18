@@ -5,7 +5,8 @@
 // every frame the UI draw passes (f_088EA200, f_088EA438) walk lists of draw records - one per element, with its
 // vertices - and draw them. Records whose element belongs to a panel at an edge are registered with the renderer
 // (rt::anchor_2d), which moves their draws and scissor by the margins. Elements placed over the 3D scene (damage
-// numbers, the lock-on cursor) are not listed and stay where the game puts them.
+// numbers, the lock-on cursor) are not listed and stay where the game puts them; unlisted elements as wide as the
+// PSP's screen (banners) are stretched to the screen's edges (rt::Layout2d::stretch).
 
 #include <cstdio>
 #include <cstdlib>
@@ -73,14 +74,31 @@ struct Box {
     float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
 };
 
+bool full_width(u32 v, u32 quads) {
+    bool left = false, right = false;
+    for (u32 i = 0; i < quads * 6; ++i) {
+        const int x = load<s16>(v + i * kVertexSize + 8);
+        left |= x <= 0, right |= x >= 480;
+    }
+    return left && right;
+}
+
 void register_anchors(u32 list, Box* boxes) {
     for (u32 r = load<u32>(list); r; r = load<u32>(r + kNext)) {
         const u32 v = load<u32>(r + kVertices), quads = load<u32>(r + kQuads);
         if (!v || !quads || quads > 4096) continue;
         const Anchor* a = anchor_of(load<u32>(r + kId) & 0xFFFF);
-        // Elements not listed stay where the game puts them, also over a panel (damage numbers).
-        psprecore::rt::System::current().layout_2d.anchor(v, v + quads * 6 * kVertexSize, a ? a->horizontal : 0, a ? a->vertical : 0);
-        if (!a || load<u32>(r + 28)) continue;  // (+28: hidden)
+        psprecore::rt::Layout2d& layout = psprecore::rt::System::current().layout_2d;
+        const u32 end = v + quads * 6 * kVertexSize;
+        if (!a) {
+            // Elements not listed stay where the game puts them, also over a panel (damage numbers); one as wide as
+            // the PSP's screen (banners: "Activating Combat Mode") reaches the screen's edges.
+            if (full_width(v, quads)) layout.stretch(v, end);
+            else layout.anchor(v, end, 0, 0);
+            continue;
+        }
+        layout.anchor(v, end, a->horizontal, a->vertical);
+        if (load<u32>(r + 28)) continue;  // (+28: hidden)
         Box& b = boxes[a - kAnchors];
         for (u32 i = 0; i < quads * 6; ++i) {
             const float x = load<s16>(v + i * kVertexSize + 8), y = load<s16>(v + i * kVertexSize + 10);
