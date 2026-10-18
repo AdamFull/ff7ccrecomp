@@ -21,10 +21,13 @@ using enum rt::gpu::IconFace;
 constexpr Icon kBattleHud[] = {{5, 101, Cross}, {16, 101, Circle}, {27, 101, Triangle}, {38, 101, Square}};
 // Text font sheet: Triangle after the regular and the italic characters (13x13 discs).
 constexpr Icon kFontSheet[] = {{6, 76, Triangle}, {6, 160, Triangle}};
+// Main menu atlas (items, materia, portraits, the menu's frames): Cross, Triangle, Square in a row (11x11 discs).
+constexpr Icon kMainMenu[] = {{175, 36, Cross}, {187, 36, Triangle}, {199, 36, Square}};
 
 constexpr IconAtlas kAtlases[] = {
     {5, 256, 256, 0x113A6D124D4EBA4Cull, kBattleHud},
     {4, 256, 256, 0x995C582AE01F4C31ull, kFontSheet},
+    {5, 256, 128, 0xAAAAE3BCF1D10376ull, kMainMenu},
 };
 
 }  // namespace
