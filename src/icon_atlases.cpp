@@ -23,8 +23,11 @@ constexpr Icon kBattleHud[] = {{5, 101, Cross}, {16, 101, Circle}, {27, 101, Tri
                                {74, 83, L},     {93, 83, R},      {32, 178, Select}};
 // Text font sheet: Triangle after the regular and the italic characters (13x13 discs).
 constexpr Icon kFontSheet[] = {{6, 76, Triangle}, {6, 160, Triangle}};
-// Main menu atlas (items, materia, portraits, the menu's frames): Cross, Triangle, Square in a row (11x11 discs).
-constexpr Icon kMainMenu[] = {{175, 36, Cross}, {187, 36, Triangle}, {199, 36, Square}};
+// Main menu atlas (items, materia, portraits, the menu's frames): Cross, Triangle, Square in a row (11x11 discs);
+// beside the "Close" / "Toggle screen" labels, larger symbols: a ring and a triangle on dark 7x7 squares, a ring
+// on an 11x11 disc.
+constexpr Icon kMainMenu[] = {{175, 36, Cross},       {187, 36, Triangle},     {199, 36, Square},
+                              {200, 50, Circle, 7},   {218, 59, Triangle, 7},  {205, 63, Circle, 7}};
 
 constexpr IconAtlas kAtlases[] = {
     {5, 256, 256, 0x113A6D124D4EBA4Cull, kBattleHud},
