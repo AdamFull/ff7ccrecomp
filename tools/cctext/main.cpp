@@ -8,6 +8,9 @@
 //   cctext verify <game>                      binary and text round trips of every message
 //   cctext font-export <game> <out.png>       the regular font's sheet as a picture to draw new characters in
 //   cctext font-import <game> <in.png> <mod dir>  the edited sheet -> <mod dir>/pkg/01472.bin
+//   cctext names-export <game> <out.po>       the name table: locations, speakers, mission titles; msgctxt
+//                                              "names.OOOOO" = offset of the field (hex)
+//   cctext names-build <game> <in.po> <mod dir>  the translated name table -> <mod dir>/pkg/00001.bin
 //
 // With <mod dir>/font/glyphs.txt (ff7cc/formats/font.hpp), build also encodes the characters the mod adds.
 //
@@ -351,6 +354,87 @@ int build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view m
     return errors ? 1 : 0;
 }
 
+// ---- the name table -------------------------------------------------------------------------------------------
+
+// Archive entry 1, loaded at boot: the names of locations, speakers above dialogue and missions, in fields of 104
+// bytes: u32 length | 0x2000 << 16, then room for 50 glyph indices (u16; bytes past the length are leftovers).
+constexpr std::size_t kNamesEntry = 1, kNameField = 104, kNameGlyphs = 50;
+constexpr std::uint16_t kNameFlag = 0x2000;
+
+std::uint16_t read16(std::span<const u8> d, std::size_t at) { return static_cast<std::uint16_t>(d[at] | (d[at + 1] << 8)); }
+
+// Offsets of the fields: a header whose glyphs are all the game's, fields 104 bytes apart.
+nx::vector<std::size_t> name_fields(std::span<const u8> file) {
+    nx::vector<std::size_t> out;
+    for (std::size_t o = 0; o + kNameField <= file.size(); o += 2) {
+        const std::uint16_t n = read16(file, o), flag = read16(file, o + 2);
+        if (flag != kNameFlag || n == 0 || n > kNameGlyphs) continue;
+        bool glyphs = true;
+        for (std::size_t i = 0; i < n && glyphs; ++i) glyphs = read16(file, o + 4 + 2 * i) < font::kFirstGlyphs;
+        if (!glyphs) continue;
+        out.push_back(o);
+        o += kNameField - 2;
+    }
+    return out;
+}
+
+int names_export(nx::fs::path_view game, nx::fs::path_view out_path) {
+    pkg::Reader reader(pkg::locate(game));
+    const auto file = reader.read(kNamesEntry);
+    const auto charset = mbd::Charset::european();
+    nx::string out = "# Crisis Core -Final Fantasy VII- name table (FF7CCRECOMP cctext names-export): locations, speakers,\n"
+                     "# missions. msgctxt: names.<field offset, hex>. At most 50 characters, one line.\n"
+                     "msgid \"\"\nmsgstr \"\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n";
+    const auto fields = name_fields(file);
+    for (const std::size_t o : fields) {
+        nx::string text;
+        for (std::size_t i = 0; i < read16(file, o); ++i) text += charset.glyphs[read16(file, o + 4 + 2 * i)];
+        out += nx::format("\nmsgctxt \"names.{:05X}\"\nmsgid {}\nmsgstr \"\"\n", o, po_string(text));
+    }
+    if (!nx::fs::file_write_text(out_path, out)) throw Exception(nx::string("cannot write ") + out_path.native());
+    std::fprintf(stderr, "%zu names -> %s\n", fields.size(), nx::string(out_path.native()).c_str());
+    return 0;
+}
+
+int names_build(nx::fs::path_view game, nx::fs::path_view po_path, nx::fs::path_view mod_dir) {
+    pkg::Reader reader(pkg::locate(game));
+    nx::vector<u8> file = reader.read(kNamesEntry);
+    const auto fields = name_fields(file);
+    const auto charset = mod_charset(mod_dir);
+    std::size_t changed = 0, errors = 0;
+    for (const auto& e : read_po(po_path)) {
+        if (e.context.empty() || e.str.empty() || e.str == e.id) continue;
+        unsigned offset = 0;
+        if (std::sscanf(e.context.c_str(), "names.%x", &offset) != 1 || std::ranges::find(fields, offset) == fields.end())
+            throw Exception("PO: " + e.context + " is not a field of the name table");
+        try {
+            const mbd::Message m = mbd::from_text(e.str, charset);
+            nx::vector<std::uint16_t> glyphs;
+            for (const auto& t : m.pages.front())
+                if (t.is_glyph()) glyphs.push_back(t.arg);
+                else if (!(t.is_control() && t.control() == mbd::kMessageEnd)) throw Exception("only characters");
+            if (m.pages.size() != 1) throw Exception("only characters");
+            if (glyphs.size() > kNameGlyphs) throw Exception(nx::format("{} characters, at most {}", glyphs.size(), kNameGlyphs));
+            std::fill(file.begin() + offset, file.begin() + offset + kNameField, u8{0});
+            const auto put = [&](std::size_t at, std::uint16_t v) { file[at] = static_cast<u8>(v), file[at + 1] = static_cast<u8>(v >> 8); };
+            put(offset, static_cast<std::uint16_t>(glyphs.size()));
+            put(offset + 2, kNameFlag);
+            for (std::size_t i = 0; i < glyphs.size(); ++i) put(offset + 4 + 2 * i, glyphs[i]);
+            ++changed;
+        } catch (const std::exception& x) {
+            ++errors;
+            std::fprintf(stderr, "%s: %s\n", e.context.c_str(), x.what());
+        }
+    }
+    const nx::string pkg_dir = path_join(mod_dir.native(), "pkg");
+    if (!nx::fs::create_directories(pkg_dir)) throw Exception("cannot create directory '" + pkg_dir + "'");
+    char name[16];
+    std::snprintf(name, sizeof name, "%05zu.bin", kNamesEntry);
+    value_or_throw(io::write_file(path_join(pkg_dir, name), file));
+    std::fprintf(stderr, "%zu names changed -> %s (%zu errors)\n", changed, path_join(pkg_dir, name).c_str(), errors);
+    return errors ? 1 : 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -373,6 +457,13 @@ int main(int argc, char** argv) {
         .positional("game", game, "the game")
         .positional("png", png, "the edited sheet")
         .positional("mod-dir", mod_dir, "mod folder to write");
+    cli.command("names-export", "the name table (locations, speakers, missions); msgctxt \"names.OOOOO\" = field")
+        .positional("game", game, "the game")
+        .positional("out", po, "PO file to write");
+    cli.command("names-build", "the translated name table -> <mod dir>/pkg/00001.bin")
+        .positional("game", game, "the game")
+        .positional("po", po, "translated PO file")
+        .positional("mod-dir", mod_dir, "mod folder to write (its font/glyphs.txt adds characters)");
     nx::string command;
     if (const int code = parse_command_line(cli, argc, argv, &command); code >= 0) return code;
     try {
@@ -381,6 +472,8 @@ int main(int argc, char** argv) {
         if (command == "verify") return verify(game);
         if (command == "font-export") return font_export(game, png);
         if (command == "font-import") return font_import(game, png, mod_dir);
+        if (command == "names-export") return names_export(game, po);
+        if (command == "names-build") return names_build(game, po, mod_dir);
         std::fputs(cli.help().c_str(), stderr);
         return 2;
     } catch (const std::exception& e) {

@@ -1,8 +1,15 @@
 # Text, translation and mods
 
-The game's dialogue and menu text lives in **MBD message tables**: 664 tables with 11,667 messages, stored as
-resources inside the Atel script modules of `discimg.pkg`. The European disc (ULES-01044) contains English text
-only; the game never asks the system for a language.
+The game's dialogue, subtitles and system messages live in **MBD message tables**: 1,425 tables with 22,835
+messages, stored as resources inside the Atel script modules of `discimg.pkg`. The European disc (ULES-01044) shows
+English only (some tables also hold German, French, Spanish and Italian blocks the game does not show); it never
+asks the system for a language.
+
+Elsewhere:
+- **The name table** (archive entry 1): location names, the speaker names above dialogue and mission titles, 472
+  fields of up to 50 characters (`names-export` / `names-build` below).
+- **Menus** (items, materia, abilities, commands): tables inside the battle and shop modules and in the executable;
+  not covered yet (a translation keeps their names in English so the dialogue matches what the menus show).
 
 ## Exporting and translating
 
@@ -30,6 +37,14 @@ changed message that fits in its original space is written in place; a longer on
 its pages move to the end of the table; a table that grows is moved to the end of the module while every other
 resource stays put. Verified in game: translated subtitles in the opening show, and the run stays identical
 otherwise.
+
+```
+cctext names-export data/original names_en.po
+cctext names-build data/original names_fr.po mods/french    # -> mods/french/pkg/00001.bin
+```
+
+The name table's PO has a context `names.OOOOO` per field (its offset, hex); each translation is one line of at
+most 50 characters. Names are drawn through the game's second font table, which the added characters reach too.
 
 ## Text syntax
 

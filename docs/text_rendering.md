@@ -33,8 +33,10 @@ small italic. Each record:
 | +20 | 0 | vertical offset of the font in its sheet (italics: 84) |
 | +24 | 96 x u32 | advance of each glyph in pixels (e.g. `T` 8, `h` 6, space 5) |
 
-Several UI objects keep their own copy of the regular record (26 copies with identical widths in the executable's
-BSS, e.g. at 0x089AB1A8), so they measure text from their copy.
+A second table of four pointers at 0x089AE564 holds records of its own (regular at 0x089ADEF0, italic at
+0x089AE08C, small, small italic): the speaker name above dialogue is drawn through it (0x088BCB88 reads its advances).
+Besides the records of these two tables, 24 more copies of the regular record are embedded in UI objects in the
+executable's data (e.g. at 0x089AB1A8), each followed by the object's own fields; the menus measure text from them.
 
 ## Layout and drawing
 
@@ -63,5 +65,6 @@ How mods add characters (usage in docs/localization.md):
    nothing changes.
 3. `cctext build` maps the added characters to their glyph indices.
 
-Not yet covered: the 26 UI objects with their own copy of the regular record (they would measure added characters
-as zero-width), the small font, and italic shapes for glyphs 228-341 (their italic cells would lie below the sheet).
+Both tables' regular and italic records get the added glyphs. Not yet covered: the 24 embedded copies (an added
+character's advance would be read from the object's next fields), the small font, and italic shapes for glyphs
+228-341 (their italic cells would lie below the sheet).
