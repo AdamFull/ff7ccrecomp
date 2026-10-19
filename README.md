@@ -177,6 +177,10 @@ reproduces the run exactly, also across renderers (the game's RAM matches betwee
 renderers). After the replay ends, live input takes over.
 `scripts\regress.ps1` replays every recording in `data\recordings` (with `NAME.state` references, written by `-Update`)
 and reports any difference in the game's RAM state.
+`scripts\pictures.ps1` compares a fixed set of pictures (frames, smooth motion's pictures in between, the other
+drawing paths) with a reference set; `scripts\smooth-check.ps1` replays recordings with `--smooth-check` and lists
+the draws smooth motion drew apart from a part of a model that moved as they did. The game's state also matches
+between the PC and Android: `--state-hash N` on both gives the same hashes for the same recording.
 
 Android: `scripts/build-android.ps1 -Install` builds and installs the APK (arm64, NDK r29). `-InstallData` copies
 the game (`data/original`, as `Crisis Core - Final Fantasy VII EU/`) and `data/cooked` to
