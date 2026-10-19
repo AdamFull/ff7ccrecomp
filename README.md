@@ -184,6 +184,13 @@ the game (`data/original`, as `Crisis Core - Final Fantasy VII EU/`) and `data/c
 to logcat (tag `ff7cc`) and `ff7cc.log` in the same folder; test options can be passed with
 `adb shell am start -n com.ff7ccrecomp/.GameActivity -e args "--perf"`.
 
+Profiling with [Tracy](https://github.com/wolfpld/tracy) 0.13.1 (the client is nx-foundation's
+`third_party/tracy` submodule): the `windows-x64-profile` preset (`scripts\build.ps1 -Preset windows-x64-profile`)
+and `scripts\build-android.ps1 -Profile -Install` build RelWithDebInfo with the runtime's zones compiled in. The game
+records only while the Tracy profiler or `tracy-capture` is connected, on port 8086 (Android:
+`adb forward tcp:8086 tcp:8086` first, and `adb forward --remove tcp:8086` before profiling the PC build). Connect
+after a fast-forward (`--fast-until`): the zones of thousands of vblanks a second take the phone's time to send.
+
 Custom GPU drivers (Adreno GPUs, e.g. Mesa's Turnip in the zip packages made for libadrenotools, with `meta.json`
 and the driver library): "Install a driver (.zip)..." in the pause menu's GPU driver section opens a file picker,
 or `scripts/build-android.ps1 -Driver <zip>` copies a package to the phone, installed by the app at its next start.

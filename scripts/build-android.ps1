@@ -11,6 +11,9 @@
 #                                                     # app at its next start, then chosen in the pause menu)
 #   scripts\build-android.ps1 -Install -Smoke         # ... then starts the app silently for 2 seconds of game time
 #                                                     # and checks that it got there (library loads, game boots)
+#   scripts\build-android.ps1 -Profile -Install       # the profile build (preset android-arm64-profile: Tracy);
+#                                                     # replaces the installed app, its data stays. Capture with
+#                                                     # adb forward tcp:8086 tcp:8086, then Tracy on localhost
 #
 # With several devices connected and no -Device (or ANDROID_SERIAL), the script asks which one to use.
 #
@@ -32,7 +35,8 @@ param(
     [switch]$SkipBuild,     # install the APK built last time
     [switch]$ListDevices,
     [switch]$Smoke,         # launch test after installing (no sound; needs the game data on the device)
-    [string]$Driver         # a custom GPU driver package (.zip with meta.json) to copy to the device
+    [string]$Driver,        # a custom GPU driver package (.zip with meta.json) to copy to the device
+    [switch]$Profile        # the profile build: RelWithDebInfo with the Tracy profiler compiled in
 )
 $ErrorActionPreference = 'Continue'  # native tools write warnings to stderr; exit codes are checked
 $root = Split-Path -Parent $PSScriptRoot
@@ -182,27 +186,47 @@ if (-not (Get-Command cmake -ErrorAction SilentlyContinue)) {
     $env:PATH = "$vs\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin;$vs\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja;$env:PATH"
 }
 
+# A profile preset's first configure takes the third-party sources its release preset fetched (no second download).
+function Get-ReusedSources([string]$preset) {
+    if ($preset -notlike '*-profile') { return @() }
+    $deps = Join-Path $root "build\$($preset -replace '-profile$', '-release')\_deps"
+    if (-not (Test-Path $deps)) { return @() }
+    Get-ChildItem $deps -Directory -Filter '*-src' | ForEach-Object {
+        "-DFETCHCONTENT_SOURCE_DIR_$(($_.Name -replace '-src$', '').ToUpper())=$($_.FullName -replace '\\', '/')"
+    }
+}
+
 Push-Location $root
 try {
-    $apk = Join-Path $root 'android\app\build\outputs\apk\release\app-release.apk'
+    $preset = if ($Profile) { 'android-arm64-profile' } else { 'android-arm64-release' }
+    $variant = if ($Profile) { 'profile' } else { 'release' }
+    $apk = Join-Path $root "android\app\build\outputs\apk\$variant\app-$variant.apk"
     if ($build) {
         $ndk = Join-Path $env:ANDROID_HOME 'ndk\29.0.14206865'
         if (-not (Test-Path $ndk)) { throw "NDK 29.0.14206865 not found under $env:ANDROID_HOME\ndk" }
         $env:ANDROID_NDK_HOME = $ndk
-        cmake --preset android-arm64-release
+        $reused = @(Get-ReusedSources $preset)
+        cmake --preset $preset @reused
         if ($LASTEXITCODE) { throw 'CMake configure failed' }
-        cmake --build --preset android-arm64-release
+        cmake --build --preset $preset
         if ($LASTEXITCODE) { throw 'CMake build failed' }
 
-        $jni = Join-Path $root 'build\android-arm64-release\jniLibs\arm64-v8a'
+        $native = Join-Path $root "build\$preset"
+        $jni = Join-Path $native 'jniLibs\arm64-v8a'
         New-Item -ItemType Directory -Force $jni | Out-Null
-        Copy-Item (Join-Path $root 'build\android-arm64-release\libmain.so') $jni -Force
+        Copy-Item (Join-Path $native 'libmain.so') $jni -Force
         # libadrenotools' hook libraries (custom GPU drivers), loaded at run time from the app's library folder.
-        Get-ChildItem (Join-Path $root 'build\android-arm64-release') -Filter 'lib*hook*.so' | Copy-Item -Destination $jni -Force
+        Get-ChildItem $native -Filter 'lib*hook*.so' | Copy-Item -Destination $jni -Force
 
         Push-Location (Join-Path $root 'android')
         try {
-            .\gradlew.bat assembleRelease --console=plain
+            if ($Profile) {
+                # SDL's Java sources: in the profile build tree, or the release one's it reused.
+                $sdl = Join-Path $native '_deps\sdl3-src'
+                if (-not (Test-Path $sdl)) { $sdl = Join-Path $root 'build\android-arm64-release\_deps\sdl3-src' }
+                .\gradlew.bat assembleProfile "-PnativePreset=$preset" "-PsdlSource=$sdl" --console=plain
+            }
+            else { .\gradlew.bat assembleRelease --console=plain }
             if ($LASTEXITCODE) { throw 'Gradle build failed' }
         } finally { Pop-Location }
         Write-Host "APK: $apk"

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The profile build only: Tracy's client listens for the profiler on a socket (port 8086, reached through adb
+     forward tcp:8086 tcp:8086). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

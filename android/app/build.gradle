@@ -1,13 +1,17 @@
 // The native library is built by CMake (preset android-arm64-release, see scripts/build-android.ps1) and
 // packaged from build/android-arm64-release/jniLibs. SDL's Java activity is compiled from the SDL sources that
 // CMake fetched, so no third-party code is copied into this repository.
+//
+// The profile build (scripts/build-android.ps1 -Profile): assembleProfile -PnativePreset=android-arm64-profile, the
+// native library with the Tracy profiler, which listens on a socket (src/profile/AndroidManifest.xml: INTERNET);
+// -PsdlSource names SDL's sources when that build tree took the release one's.
 
 plugins {
     id 'com.android.application'
 }
 
-def nativeBuild = file("${rootDir}/../build/android-arm64-release")
-def sdlJava = file("${nativeBuild}/_deps/sdl3-src/android-project/app/src/main/java")
+def nativeBuild = file("${rootDir}/../build/${project.findProperty('nativePreset') ?: 'android-arm64-release'}")
+def sdlJava = file("${project.findProperty('sdlSource') ?: "${nativeBuild}/_deps/sdl3-src"}/android-project/app/src/main/java")
 
 android {
     namespace = 'com.ff7ccrecomp'
@@ -34,6 +38,10 @@ android {
         release {
             minifyEnabled = false
             signingConfig = signingConfigs.debug  // local builds only; nothing is published
+        }
+        profile {
+            initWith release
+            matchingFallbacks = ['release']
         }
     }
 

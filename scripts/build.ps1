@@ -2,6 +2,7 @@
 #
 #   scripts\build.ps1                       # windows-x64-debug, build + tests
 #   scripts\build.ps1 -Preset windows-x64-release -NoTest
+#   scripts\build.ps1 -Preset windows-x64-profile -NoTest   # RelWithDebInfo with the Tracy profiler (port 8086)
 param(
     [string]$Preset = 'windows-x64-debug',
     [switch]$NoTest,
@@ -29,11 +30,22 @@ $extra = @(
 ) | Where-Object { Test-Path $_ }
 $env:PATH = ($extra + $env:PATH) -join ';'
 
+# A profile preset's first configure takes the third-party sources its release preset fetched (no second download).
+function Get-ReusedSources([string]$preset) {
+    if ($preset -notlike '*-profile') { return @() }
+    $deps = Join-Path $root "build\$($preset -replace '-profile$', '-release')\_deps"
+    if (-not (Test-Path $deps)) { return @() }
+    Get-ChildItem $deps -Directory -Filter '*-src' | ForEach-Object {
+        "-DFETCHCONTENT_SOURCE_DIR_$(($_.Name -replace '-src$', '').ToUpper())=$($_.FullName -replace '\\', '/')"
+    }
+}
+
 # Native tools report warnings on stderr; under 'Stop' PowerShell 5.1 would abort on them. Exit codes are checked.
 $ErrorActionPreference = 'Continue'
 Push-Location $root
 try {
-    cmake --preset $Preset
+    $reused = @(Get-ReusedSources $Preset)
+    cmake --preset $Preset @reused
     if ($LASTEXITCODE) { throw "configure failed ($LASTEXITCODE)" }
     if ($Target) { cmake --build --preset $Preset --target @Target }
     else { cmake --build --preset $Preset }
