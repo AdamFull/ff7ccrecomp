@@ -17,8 +17,10 @@ using rt::gpu::Icon;
 using rt::gpu::IconAtlas;
 using enum rt::gpu::IconFace;
 
-// Battle HUD atlas: Cross, Circle, Triangle, Square in a row (11x11 discs).
-constexpr Icon kBattleHud[] = {{5, 101, Cross}, {16, 101, Circle}, {27, 101, Triangle}, {38, 101, Square}};
+// Battle HUD atlas: Cross, Circle, Triangle, Square in a row (11x11 discs); the L and R capsules beside the command
+// bar (13x9, the letter towards the outer end: the selected item's glow covers the inner end) and SELECT (26x10).
+constexpr Icon kBattleHud[] = {{5, 101, Cross}, {16, 101, Circle}, {27, 101, Triangle}, {38, 101, Square},
+                               {74, 83, L},     {93, 83, R},      {32, 178, Select}};
 // Text font sheet: Triangle after the regular and the italic characters (13x13 discs).
 constexpr Icon kFontSheet[] = {{6, 76, Triangle}, {6, 160, Triangle}};
 // Main menu atlas (items, materia, portraits, the menu's frames): Cross, Triangle, Square in a row (11x11 discs).
