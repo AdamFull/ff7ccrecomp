@@ -106,17 +106,25 @@ nx::vector<ExtraGlyph> parse_glyphs(nx::string_view text) {
         const auto fail = [&](const char* why) {
             throw Exception(nx::format("glyphs.txt line {}: {}", line_number, why));
         };
-        // <index> <character> <advance>
+        // <index> <character> <advance>, or <index> <character> - (an alias of one of the game's glyphs)
         const std::size_t a = line.find_first_of(" \t");
         const std::size_t b = line.find_last_of(" \t");
         if (a == nx::string_view::npos || b == a) fail("expected <glyph index> <character> <advance>");
         ExtraGlyph g;
         g.index = std::atoi(nx::string(line.substr(0, a)).c_str());
-        g.advance = std::atoi(nx::string(line.substr(b + 1)).c_str());
+        const nx::string_view advance = line.substr(b + 1);
+        const bool alias = advance == "-";
+        g.advance = alias ? 0 : std::atoi(nx::string(advance).c_str());
         nx::string_view ch = line.substr(a, b - a);
         while (!ch.empty() && (ch.front() == ' ' || ch.front() == '\t')) ch.remove_prefix(1);
         while (!ch.empty() && (ch.back() == ' ' || ch.back() == '\t')) ch.remove_suffix(1);
         g.text = nx::string(ch);
+        if (alias) {
+            if (g.index < 0 || g.index >= kFirstGlyphs) fail("an alias names one of the game's glyphs (0-95)");
+            if (g.text.empty()) fail("bad character");
+            out.push_back(std::move(g));
+            continue;
+        }
         if (!free_glyph(g.index)) fail("the glyph index is not a free cell (96-113, 228-341)");
         if (g.text.empty() || g.advance <= 0 || g.advance > 2 * kCellWidth) fail("bad character or advance");
         out.push_back(std::move(g));

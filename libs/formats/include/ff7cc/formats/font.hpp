@@ -52,9 +52,11 @@ void swizzle4(std::span<const std::uint8_t> indices, int width, int height, std:
 struct ExtraGlyph {
     int index = 0;
     nx::string text;  // UTF-8
-    int advance = 0;  // pixels the pen moves after the glyph
+    int advance = 0;  // pixels the pen moves after the glyph; 0: an alias of one of the game's glyphs
 };
-// Parses glyphs.txt; throws FormatError naming the line on malformed input or an index outside the free cells.
+// Parses glyphs.txt: "<index> <character> <advance>" for a glyph drawn into a free cell, "<index> <character> -" with
+// one of the game's glyphs (0-95) for an alias: a character written with that glyph (Cyrillic А as Latin A). Throws
+// FormatError naming the line on malformed input or an index outside the free cells.
 nx::vector<ExtraGlyph> parse_glyphs(nx::string_view text);
 
 }  // namespace ff7cc::font

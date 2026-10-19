@@ -200,6 +200,10 @@ Message from_text(nx::string_view text, const Charset& charset) {
             encode.emplace(charset.glyphs[i], static_cast<std::uint16_t>(i));
             longest = std::max(longest, charset.glyphs[i].size());
         }
+    for (const auto& [text, glyph] : charset.aliases) {
+        encode.emplace(text, glyph);
+        longest = std::max(longest, text.size());
+    }
 
     Message m;
     m.pages.emplace_back();

@@ -65,6 +65,14 @@ palette become the nearest one). Then list the characters in `mods/french/font/g
 229 Ж 10
 ```
 
+A character that looks like one of the game's can use its glyph instead of a free cell: an alias line names the
+game's glyph (0-95) and `-` for the advance. Cyrillic needs only its 48 other letters drawn this way:
+
+```
+0 А -       # Cyrillic А written with the game's A (glyph 0); italics work too
+26 а -
+```
+
 Glyph n is cell n % 19 of row n / 19. Free are glyphs 96–113 (the rest of row 5; the same cells of row 11 hold their
 italic shapes) and 228–341 (rows 12–17, regular only: italic text cannot use them). `cctext build` reads the file
 when it builds into that mod folder, and the game reads it at start to give the font table room for the new

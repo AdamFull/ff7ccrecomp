@@ -215,7 +215,10 @@ mbd::Charset mod_charset(nx::fs::path_view mod_dir) {
     if (!is_file(path)) return charset;
     const auto text = nx::fs::file_read_text(path);
     if (!text.has_value()) throw Exception("cannot read '" + path + "'");
-    for (const auto& g : font::parse_glyphs(text.value())) charset.glyphs[static_cast<std::size_t>(g.index)] = g.text;
+    for (const auto& g : font::parse_glyphs(text.value())) {
+        if (g.advance) charset.glyphs[static_cast<std::size_t>(g.index)] = g.text;
+        else charset.aliases.emplace_back(g.text, static_cast<std::uint16_t>(g.index));
+    }
     std::fprintf(stderr, "characters from %s\n", path.c_str());
     return charset;
 }

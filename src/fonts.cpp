@@ -34,7 +34,8 @@ void collect_mod_glyphs(std::span<const nx::string> mods) {
         const auto text = nx::fs::file_read_text(path);
         try {
             if (!text.has_value()) throw Exception("unreadable");
-            for (const auto& g : font::parse_glyphs(text.value())) g_advances[g.index] = g.advance;
+            for (const auto& g : font::parse_glyphs(text.value()))
+                if (g.advance) g_advances[g.index] = g.advance;  // (aliases use the game's glyphs as they are)
         } catch (const std::exception& e) {
             std::fprintf(stderr, "mods: %s: %s\n", path.c_str(), e.what());
         }

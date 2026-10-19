@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <utility>
 
 #include "core/foundation/core/foundation.h"
 #include "core/foundation/containers/map.h"
@@ -65,6 +66,9 @@ nx::vector<u8> patch(std::span<const u8> original, const nx::map<std::size_t, Me
 // Glyph index -> UTF-8 text. Unnamed glyphs are written as {G:n}.
 struct Charset {
     std::array<nx::string, 512> glyphs;  // by glyph index (the game has 96; mods add more, font.hpp)
+    // More characters written with a glyph (from_text only; to_text names the glyph by `glyphs`): a mod's Cyrillic
+    // А as the game's A.
+    nx::vector<std::pair<nx::string, std::uint16_t>> aliases;
 
     // The font of the European English release: glyphs 0-95 of its sheet (the text uses no others).
     static Charset european();
