@@ -17,8 +17,9 @@
 //   code[code_size]       VM bytecode (plain); code_offset fields point into it.
 //   filler up to the next 16-byte file offset
 //   u32 resource_count, u32 resource_count (repeated)
-//   { u32 offset, u32 size }[resource_count]   offsets relative to the end of this table
-//   resource data, each at a 16-byte aligned offset; the file ends 16-byte aligned.
+//   { u32 offset, u32 size }[resource_count]
+//   filler up to the next 16-byte file offset (8 bytes when the resource count is even)
+//   resource data, at 16-byte aligned offsets from here (the base); the file ends 16-byte aligned.
 //
 // The bytes between a resource's declared end and the next resource ("slack") are mostly random
 // filler but sometimes hold data the declared size omits (e.g. an MBD end marker), so they are
@@ -71,7 +72,8 @@ struct Module {
     nx::vector<Object> objects;
     nx::vector<u8> names;         // always decrypted in memory
     nx::vector<u8> code;
-    nx::vector<u8> code_padding;  // filler between the code and the resource table
+    nx::vector<u8> code_padding;   // filler between the code and the resource table
+    nx::vector<u8> table_padding;  // filler between the resource table and the resources' base
     nx::vector<Resource> resources;
 
     // NUL-terminated string at `offset` in the name pool (Shift-JIS for non-ASCII text).

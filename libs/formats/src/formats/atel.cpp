@@ -151,7 +151,12 @@ Module parse(std::span<const u8> data) {
         s.size = in.read<std::uint32_t>();
     }
 
-    const std::size_t base = in.pos();
+    // Offsets count from the next 16-byte boundary: with an even resource count the table (8 + 8 * count bytes)
+    // ends 8 bytes short of it, and read from the table's end every resource of such a module came out 8 bytes
+    // early (the field and event modules' dialogue tables, 764 of the game's 1428, were not found).
+    const std::size_t base = align_up(in.pos(), kResourceAlignment);
+    if (base > data.size()) throw Exception("Atel module truncated after its resource table");
+    m.table_padding = in.bytes(base - in.pos());
     m.resources.resize(resource_count);
     for (std::size_t i = 0; i < resource_count; ++i) {
         const std::size_t begin = base + spans[i].offset;
@@ -218,6 +223,11 @@ nx::vector<u8> serialize(const Module& m) {
         out.put_value(std::uint32_t{0});
     }
 
+    // Keep the original filler when it still lands on the boundary; otherwise zero-fill.
+    if ((out.size() + m.table_padding.size()) % kResourceAlignment == 0 && m.table_padding.size() < kResourceAlignment)
+        out.put_bytes(m.table_padding);
+    else
+        out.zero_fill_to_multiple(0, kResourceAlignment);
     const std::size_t base = out.size();
     for (std::size_t i = 0; i < m.resources.size(); ++i) {
         const auto& r = m.resources[i];
@@ -248,7 +258,7 @@ nx::vector<u8> replace_resources(std::span<const u8> module,
     std::size_t table = kHeaderSize;
     for (const auto& obj : m.objects) table += 12 + 8 * obj.methods.size();
     table = align_up(table + m.names.size() + m.code.size(), kResourceAlignment);
-    const std::size_t count = m.resources.size(), base = table + 8 + 8 * count;
+    const std::size_t count = m.resources.size(), base = align_up(table + 8 + 8 * count, kResourceAlignment);
 
     nx::vector<u8> out(module.begin(), module.end());
     const auto read32 = [&](std::size_t at) {
