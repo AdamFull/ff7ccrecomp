@@ -5,11 +5,15 @@ messages, stored as resources inside the Atel script modules of `discimg.pkg`. T
 English only (some tables also hold German, French, Spanish and Italian blocks the game does not show); it never
 asks the system for a language.
 
+The same export covers the MBD tables outside script modules: the system messages and the main menu's help lines
+(archive entry 1, tables 3, 5 and 7), the mission descriptions (entry 1435) and the mail (entry 1436).
+
 Elsewhere:
 - **The name table** (archive entry 1): location names, the speaker names above dialogue and mission titles, 472
   fields of up to 50 characters (`names-export` / `names-build` below).
-- **Menus** (items, materia, abilities, commands): tables inside the battle and shop modules and in the executable;
-  not covered yet (a translation keeps their names in English so the dialogue matches what the menus show).
+- **Menu text** (`menus-export` / `menus-build` below): names and descriptions of accessories, items, materials,
+  materia, battle commands and abilities (entries 10616-10621); mission categories and titles (1435); mail folders,
+  senders and subjects (1436); the names of enemies and their actions in every battle module.
 
 ## Exporting and translating
 
@@ -45,6 +49,21 @@ cctext names-build data/original names_fr.po mods/french    # -> mods/french/pkg
 
 The name table's PO has a context `names.OOOOO` per field (its offset, hex); each translation is one line of at
 most 50 characters. Names are drawn through the game's second font table, which the added characters reach too.
+
+```
+cctext menus-export data/original menus_en.po
+cctext menus-build data/original menus_fr.po mods/french   # -> pkg/106NN.bin, 01435.bin, 01436.bin, battle .atel
+```
+
+Menu strings are one line each (ff7cc/formats/strings.hpp has the formats). Contexts:
+- `menus.EEEEE.RRR.name` / `.desc`: a record's name or description in a string table (10616-10621); any length.
+- `menus.EEEEE.OOOOO`: a field of the mission or mail file at that offset (hex); the PO comment gives its room in
+  characters.
+- `battle.EEEEE.NNN`: the NNN-th enemy or action name of a battle module; room in characters as commented (about
+  half again the English length).
+
+Some files take text from several commands, each building on the copy the one before left in the mod folder:
+build a pack from an empty `pkg/` in this order: `font-import`, `names-build`, `build`, `menus-build`.
 
 ## Text syntax
 
@@ -91,8 +110,8 @@ game's glyph (0-95) and `-` for the advance. Cyrillic needs only its 48 other le
 Glyph n is cell n % 19 of row n / 19. Free are glyphs 96–113 (the rest of row 5; the same cells of row 11 hold their
 italic shapes) and 228–341 (rows 12–17, regular only: italic text cannot use them). `cctext build` reads the file
 when it builds into that mod folder, and the game reads it at start to give the font table room for the new
-glyphs' advances (docs/text_rendering.md). Verified on the opening subtitles. Menus that keep their own copy of the
-font's advances may not measure added characters correctly yet.
+glyphs' advances (docs/text_rendering.md). Verified on the opening subtitles. Some menus measure text from their own
+copy of the font's advances (docs/text_rendering.md): with added characters, check them on screen.
 
 ## Mods
 

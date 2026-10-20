@@ -1,4 +1,4 @@
-# Crisis Core's own formats: the archive (discimg.pkg/fse), ATEL scripts, MBD message data.
+# Crisis Core's own formats: the archive (discimg.pkg/fse), ATEL scripts, MBD message data, fonts, glyph strings.
 add_library(ff7cc_game_formats STATIC
     src/formats/pkg.cpp
     src/formats/atel.cpp
@@ -7,6 +7,8 @@ add_library(ff7cc_game_formats STATIC
     src/formats/atel_asm.cpp
     src/formats/mbd.cpp
     src/formats/font.cpp
+    src/formats/strings.cpp
+    src/formats/sections.cpp
 )
 add_library(ff7cc::game_formats ALIAS ff7cc_game_formats)
 

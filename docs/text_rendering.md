@@ -65,6 +65,16 @@ How mods add characters (usage in docs/localization.md):
    nothing changes.
 3. `cctext build` maps the added characters to their glyph indices.
 
-Both tables' regular and italic records get the added glyphs. Not yet covered: the 24 embedded copies (an added
-character's advance would be read from the object's next fields), the small font, and italic shapes for glyphs
-228-341 (their italic cells would lie below the sheet).
+Both tables' regular and italic records get the added glyphs.
+
+The menus draw their text (item, materia and ability names, the help line) in the small font: font ids 2 and 3 of
+the second table (records at 0x089AE228 and 0x089AE3C4; the first table's at 0x089AD520 and 0x089AD6BC), header
+`96, 4, 23, 11, 15, 0` (and 75: the second copy of the glyphs lower in the sheet), advances = stroke width + 1 (`H`
+6, `n` 5). The layout code reads them in `f_088BCFD0`. A glyph drawn into the small sheet too (`cctext font-import
+--small`; glyphs.txt's fourth column gives its small advance) gets those records extended the same way. Its free
+cells are 96-113 and 229-275, at the same indices as the regular font's, with their second copies (glyph 228's cell
+is the second copy of 113).
+
+Not yet covered: the 24 copies of the regular record embedded in UI objects (no added glyph was missing on the
+screens checked: items, materia, help lines, battle HUD), and italic shapes for glyphs 228-341 (their italic cells
+would lie below the sheet).

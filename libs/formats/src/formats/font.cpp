@@ -1,5 +1,6 @@
 #include "ff7cc/formats/font.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -106,19 +107,24 @@ nx::vector<ExtraGlyph> parse_glyphs(nx::string_view text) {
         const auto fail = [&](const char* why) {
             throw Exception(nx::format("glyphs.txt line {}: {}", line_number, why));
         };
-        // <index> <character> <advance>, or <index> <character> - (an alias of one of the game's glyphs)
-        const std::size_t a = line.find_first_of(" \t");
-        const std::size_t b = line.find_last_of(" \t");
-        if (a == nx::string_view::npos || b == a) fail("expected <glyph index> <character> <advance>");
+        // <index> <character> <advance> [<small font advance>], or <index> <character> - (an alias of one of the
+        // game's glyphs)
+        nx::vector<nx::string_view> fields;
+        for (std::size_t at = 0; at < line.size();) {
+            const std::size_t first = line.find_first_not_of(" \t", at);
+            if (first == nx::string_view::npos) break;
+            const std::size_t last = std::min(line.find_first_of(" \t", first), line.size());
+            fields.push_back(line.substr(first, last - first));
+            at = last;
+        }
+        if (fields.size() < 3 || fields.size() > 4)
+            fail("expected <glyph index> <character> <advance> [<small advance>]");
         ExtraGlyph g;
-        g.index = std::atoi(nx::string(line.substr(0, a)).c_str());
-        const nx::string_view advance = line.substr(b + 1);
-        const bool alias = advance == "-";
-        g.advance = alias ? 0 : std::atoi(nx::string(advance).c_str());
-        nx::string_view ch = line.substr(a, b - a);
-        while (!ch.empty() && (ch.front() == ' ' || ch.front() == '\t')) ch.remove_prefix(1);
-        while (!ch.empty() && (ch.back() == ' ' || ch.back() == '\t')) ch.remove_suffix(1);
-        g.text = nx::string(ch);
+        g.index = std::atoi(nx::string(fields[0]).c_str());
+        const bool alias = fields[2] == "-";
+        g.advance = alias ? 0 : std::atoi(nx::string(fields[2]).c_str());
+        if (fields.size() == 4) g.small_advance = std::atoi(nx::string(fields[3]).c_str());
+        g.text = nx::string(fields[1]);
         if (alias) {
             if (g.index < 0 || g.index >= kFirstGlyphs) fail("an alias names one of the game's glyphs (0-95)");
             if (g.text.empty()) fail("bad character");
@@ -127,6 +133,9 @@ nx::vector<ExtraGlyph> parse_glyphs(nx::string_view text) {
         }
         if (!free_glyph(g.index)) fail("the glyph index is not a free cell (96-113, 228-341)");
         if (g.text.empty() || g.advance <= 0 || g.advance > 2 * kCellWidth) fail("bad character or advance");
+        if (g.small_advance < 0 || g.small_advance > 2 * kSmallCellWidth) fail("bad small font advance");
+        if (g.small_advance && !free_small_glyph(g.index))
+            fail("the glyph index is not a free cell of the small sheet (96-113, 229-275)");
         out.push_back(std::move(g));
     }
     return out;
