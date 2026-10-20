@@ -143,3 +143,20 @@ For palette textures (the font, much of the interface) an index map is usually b
 Put an enlarged, redrawn map into `mods/<mod>/textures/indexed/` (same grey levels only, no smoothing between them)
 and the game colours it with whatever palette it uses at the moment, so one HD font serves white, yellow and grey
 text alike.
+
+A mod's picture comes first, then a mod's index map, then the baked HD set (`data/cooked/textures`): a mod
+replaces a texture even where an HD version exists. To keep the HD look elsewhere in an atlas, draw into the baked
+picture (it is 4x the original) rather than an enlarged dump.
+
+#### Words in pictures
+
+Much of the interface draws English words from atlases: the main menu atlas (titles, tabs, labels, mail folders),
+the Help banner, the button labels, the title menu and the battle HUD (LIMIT, the DMW moods). Words are packed
+next to each other, and a menu draws a part of the atlas per word, so a translated word must stay inside the
+texels the game shows for it. `--ge-dump-at VBLANK` lists, under each draw, every textured rectangle as
+`sprite x .. y ..  uv u0,v0..u1,v1`: the screen place and the texels. Some words are drawn in parts (the menu shows
+"Materia" alone and as the start of "Materia Fusion"; the title menu adds one "Game" to "New" and to "Load"), so
+the translation has to read right both ways ("Начать | игру", "Загрузить | игру").
+
+The atlases' rectangles are fixed by the game, so a longer word gets narrower or smaller letters; rectangles as tall
+as the English capitals leave no room for Cyrillic descenders, and their words are drawn smaller.
