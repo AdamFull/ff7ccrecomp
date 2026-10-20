@@ -151,12 +151,16 @@ picture (it is 4x the original) rather than an enlarged dump.
 #### Words in pictures
 
 Much of the interface draws English words from atlases: the main menu atlas (titles, tabs, labels, mail folders),
-the Help banner, the button labels, the title menu and the battle HUD (LIMIT, the DMW moods). Words are packed
+the Help banner, the button labels, the title menu, the battle HUD (LIMIT, the DMW moods, MISS/GUARD), the battle
+banners, status and field labels, difficulty names, the DMW cards and Warning!/BREAK. Words are packed
 next to each other, and a menu draws a part of the atlas per word, so a translated word must stay inside the
 texels the game shows for it. `--ge-dump-at VBLANK` lists, under each draw, every textured rectangle as
 `sprite x .. y ..  uv u0,v0..u1,v1`: the screen place and the texels. Some words are drawn in parts (the menu shows
 "Materia" alone and as the start of "Materia Fusion"; the title menu adds one "Game" to "New" and to "Load"), so
-the translation has to read right both ways ("Начать | игру", "Загрузить | игру").
+the translation has to read right both ways ("Начать | игру", "Загрузить | игру"). The battle banners draw each
+word as a capital and the rest, placed side by side on the screen (sometimes overlapping a little): a Russian
+word laid out along the screen and cut back into the two sprites reads whole again. Some words are stored turned
+a quarter (the vertical "Warning!").
 
 The atlases' rectangles are fixed by the game, so a longer word gets narrower or smaller letters; rectangles as tall
 as the English capitals leave no room for Cyrillic descenders, and their words are drawn smaller.
